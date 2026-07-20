@@ -17,6 +17,13 @@ App full HTML (single-file `index.html`) com Firebase (Auth + Firestore) para ge
 - **Compradores (store)**: fazem pedidos por filial (Madri, Oeste, Solange, Parque Oeste)
 
 ## Implemented
+- 2026-01-20: **Nova aba dedicada "🔔 Alterações Hoje"**
+  - 3ª aba no comprador (ao lado de "Fazer Pedido" e "Preços de Venda") com contador (badge rose-500) do total de produtos com preço de venda alterado hoje na filial.
+  - Botão "Ver alterações" do banner de notificação agora navega direto para esta aba (`switchStoreCard('changes')`).
+  - Cards individuais por produto: header colorido (rose se subiu, emerald se caiu), chip "R$ anterior → R$ atual", percentual de variação, lista de todas as alterações do dia com horário, valor riscado, novo valor e diferença; rodapé com preço atual vigente na filial.
+  - Estado vazio elegante quando não há alterações ("Você está com os preços do dia em dia").
+  - Linha expansível de histórico foi **removida** do card "Fazer Pedido" — apenas o badge inline compacto "anterior → atual" permanece ali para contexto rápido, deixando o card de pedidos muito mais limpo e mobile-friendly.
+  - Sincronização automática: `computeTodayChanges()` atualiza contador do botão + banner sempre que produtos/preços mudam em tempo real.
 - 2026-01-20: **Quantidades fracionadas + limpeza mobile no card de Pedido**
   - Input de quantidade no card "Fazer Pedido" (comprador) e nas colunas por loja do painel ADM agora aceita valores decimais (`type=number step=0.5 inputmode=decimal`). Ex: 0,5 kg / 1,5 / 2,5 — ideal para "meio kg" ou "metade da caixa".
   - `updateStoreQuantity` e `updateStoreQuantityFromAdmin` usam `parseFloat` (com replace de vírgula por ponto) em vez de `parseInt`.
