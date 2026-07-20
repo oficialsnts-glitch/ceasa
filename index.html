@@ -48,6 +48,10 @@
                     Entrar no Sistema
                 </button>
             </form>
+            <p class="mt-4 text-[10px] text-slate-400 text-center leading-relaxed">
+                Primeiro acesso do ADM master: digite o e-mail e a senha desejada.<br>
+                A conta será ativada automaticamente no Firebase.
+            </p>
         </div>
     </div>
 
@@ -259,6 +263,57 @@
         const db = getFirestore(app);
         const auth = getAuth(app);
 
+        // ================= MASTER ADMIN (auto-bootstrap) =================
+        // Este e-mail sempre será reconhecido como ADM master.
+        // Se não existir no Firebase Auth, será criado automaticamente
+        // no primeiro login usando a senha digitada.
+        const MASTER_ADMIN_EMAIL = "oficialsnts@gmail.com";
+
+        async function ensureMasterAdminProfile(user) {
+            // Garante que exista um documento em users/{uid} com role=admin
+            // Se já houver um documento avulso (email igual, id diferente),
+            // seus dados (nome, etc.) são migrados e o avulso é removido.
+            const masterRef = doc(db, "users", user.uid);
+            const masterSnap = await getDoc(masterRef);
+
+            let baseData = {
+                name: "Administrador Master",
+                email: MASTER_ADMIN_EMAIL,
+                role: "admin",
+                storeName: "Central"
+            };
+
+            if (masterSnap.exists()) {
+                const existing = masterSnap.data();
+                // Força role admin, mantém nome/loja se já preenchidos
+                await setDoc(masterRef, {
+                    name: existing.name || baseData.name,
+                    email: MASTER_ADMIN_EMAIL,
+                    role: "admin",
+                    storeName: existing.storeName || "Central"
+                });
+            } else {
+                // Verifica se existe um doc avulso com o mesmo e-mail
+                const q = query(collection(db, "users"), where("email", "==", MASTER_ADMIN_EMAIL));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    const legacy = snap.docs[0];
+                    const legacyData = legacy.data();
+                    baseData = {
+                        name: legacyData.name || baseData.name,
+                        email: MASTER_ADMIN_EMAIL,
+                        role: "admin",
+                        storeName: legacyData.storeName || "Central"
+                    };
+                    // Remove legado se o id não for igual ao uid
+                    if (legacy.id !== user.uid) {
+                        try { await deleteDoc(doc(db, "users", legacy.id)); } catch(_) {}
+                    }
+                }
+                await setDoc(masterRef, baseData);
+            }
+        }
+
         window.state = {
             stores: ["Madri", "Oeste", "Solange", "Parque Oeste"],
             suppliers: [],
@@ -274,6 +329,18 @@
         // Escuta o estado da Autenticação do Firebase
         onAuthStateChanged(auth, async (user) => {
             if (user) {
+                const isMaster = (user.email || "").toLowerCase() === MASTER_ADMIN_EMAIL;
+
+                // Se for o ADM master, garante o perfil correto antes de prosseguir
+                if (isMaster) {
+                    try {
+                        await ensureMasterAdminProfile(user);
+                    } catch (err) {
+                        console.error("Erro ao configurar ADM master:", err);
+                        alert("Erro ao configurar o perfil do ADM master: " + err.message);
+                    }
+                }
+
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
                     window.state.currentUser = { uid: user.uid, ...userDoc.data() };
@@ -382,12 +449,39 @@
             e.preventDefault();
             const email = document.getElementById("login-email").value.trim().toLowerCase();
             const password = document.getElementById("login-password").value;
+            const isMaster = email === MASTER_ADMIN_EMAIL;
 
             try {
                 // Tenta logar normalmente
                 await signInWithEmailAndPassword(auth, email, password);
             } catch (err) {
-                if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+                const code = err.code || "";
+                const isAuthMissing = ["auth/user-not-found", "auth/invalid-credential", "auth/invalid-login-credentials"].includes(code);
+
+                // --- CASO ESPECIAL: ADM MASTER ---
+                // Se for o e-mail master e a conta ainda não existir no Firebase Auth,
+                // cria automaticamente com a senha digitada (bootstrap).
+                if (isMaster && isAuthMissing) {
+                    if (password.length < 6) {
+                        alert("A senha do ADM master precisa ter no mínimo 6 caracteres.");
+                        return;
+                    }
+                    try {
+                        await createUserWithEmailAndPassword(auth, email, password);
+                        // onAuthStateChanged cuidará de configurar o perfil admin.
+                        return;
+                    } catch (createErr) {
+                        if (createErr.code === "auth/email-already-in-use") {
+                            alert("Este e-mail já está registrado no Firebase Auth, mas a senha digitada está incorreta. Verifique a senha e tente novamente.");
+                            return;
+                        }
+                        alert("Erro ao inicializar ADM master: " + createErr.message);
+                        return;
+                    }
+                }
+
+                // --- FLUXO PROVISÓRIO DE OUTROS USUÁRIOS ---
+                if (isAuthMissing) {
                     // Verifica se o ADM deixou um pré-cadastro no Firestore
                     const q = query(collection(db, "users"), where("email", "==", email));
                     const querySnapshot = await getDocs(q);
@@ -399,6 +493,7 @@
                             return;
                         } catch(createErr) {
                             alert("Erro ao inicializar credencial: " + createErr.message);
+                            return;
                         }
                     }
                 }
