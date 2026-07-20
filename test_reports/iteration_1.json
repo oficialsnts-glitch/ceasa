@@ -1,0 +1,23 @@
+{
+  "summary": "Testado features de quantidade decimal e remoção de badges no card 'Fazer Pedido'. Login ADM funcionou, painel admin renderiza inputs de quantidade por loja com type=number min=0 step=0.5 inputmode=decimal; entrada 0.5 aceita e Total exibido em pt-BR ('0,5'). Textos 'Alterado Hoje' e 'Modificado por Central' foram completamente removidos do código-fonte (grep confirmou zero ocorrências). 'Atualizado Hoje' permanece apenas na aba 'Preços de Venda' (linha 2010) conforme esperado. Template do store order card (linhas 1860-1884) confirmado por inspeção: input com data-testid='store-qty-input-${p.id}', type=number, min=0, step=0.5, inputmode=decimal — sem badges/spans indesejados. updateStoreQuantity e updateStoreQuantityFromAdmin usam parseFloat (aceitando decimal). updateCartBadge e reviewOrder formatam qty com toLocaleString('pt-BR', {maximumFractionDigits:2}).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/admin_frutas_expanded.png"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Arquivo /app/index.html tem 2164 linhas - considerar separar JS em módulos para manutenibilidade",
+    "cdn.tailwindcss.com em produção emite warning - migrar para build/CLI do Tailwind"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100%"},
+  "test_credentials": "ADM Master: oficialsnts@gmail.com / 0fici@lSnts27 (funcional, auto-bootstrap OK)",
+  "seed_data_creation": "Nenhum. Usado produto existente CAJU BANDEJA na coluna Madri (qty=0.5) para validar decimais + Total.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "App single-page HTML/Firebase real. Não há conta de comprador (store) pré-cadastrada nos test_credentials. Para testar fluxo completo do comprador (badge-total-items, review-order-btn, debounce 300ms de updateStoreQuantity, price-change-banner), o agente deve criar uma conta store via aba Cadastros do ADM primeiro. Verificação da UI do comprador foi feita por inspeção de código-fonte (linhas 1860-1884): estrutura da linha do produto contém APENAS nome + priceChangeBadge (histórico de venda 'anterior→atual', que é o esperado) — NENHUM badge âmbar 'Alterado Hoje' nem span 'Modificado por Central'.",
+  "rca of the issue": "N/A - todas as alterações solicitadas estão implementadas corretamente conforme code review + validação UI admin."
+}

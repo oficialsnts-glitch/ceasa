@@ -1387,7 +1387,8 @@
         };
 
         window.updateStoreQuantityFromAdmin = async function(storeName, productId, val) {
-            const qty = parseInt(val);
+            // Aceita quantidades fracionadas (ex: 0,5 / 1,5 kg)
+            const qty = parseFloat(String(val).replace(',', '.'));
             const ref = doc(db, "orders", storeName);
             // ATÔMICO POR CAMPO: evita race quando várias abas/usuários editam o mesmo doc de pedidos.
             // Cada write mexe apenas na chave `quantities.{productId}` sem sobrescrever as outras.
@@ -1483,7 +1484,7 @@
             const key = currentStore + "|" + productId;
             clearTimeout(window.__qtyTimers[key]);
             window.__qtyTimers[key] = setTimeout(async () => {
-                const qty = parseInt(val);
+                const qty = parseFloat(String(val).replace(',', '.'));
                 const ref = doc(db, "orders", currentStore);
                 // ATÔMICO POR CAMPO -> evita race entre compradores simultâneos da mesma filial.
                 const patch = {};
@@ -1630,10 +1631,10 @@
                             let totalItemQty = 0;
                             window.state.stores.forEach(st => {
                                 const qty = (window.state.orders[st] && window.state.orders[st][p.id]) ? window.state.orders[st][p.id] : "";
-                                totalItemQty += (parseInt(qty) || 0);
+                                totalItemQty += (parseFloat(qty) || 0);
                                 storeQtyColumns += `
                                     <td class="p-1 border-r border-slate-200 text-center bg-blue-50/20">
-                                        <input type="number" min="0" value="${qty}" 
+                                        <input type="number" min="0" step="0.5" inputmode="decimal" value="${qty}"
                                             onchange="updateStoreQuantityFromAdmin('${st}', '${p.id}', this.value)" 
                                             placeholder="0" 
                                             class="excel-input w-12 text-center p-0.5 font-bold border border-transparent rounded bg-transparent text-blue-950 focus:bg-white text-xs outline-none">
@@ -1684,7 +1685,7 @@
                                     </td>
                                     <td class="p-2 border-r border-slate-200 bg-slate-50/30 w-64">${pricingHtml}</td>
                                     ${storeQtyColumns}
-                                    <td class="p-1 border-r border-slate-200 text-center font-black bg-slate-100 text-slate-800">${totalItemQty}</td>
+                                    <td class="p-1 border-r border-slate-200 text-center font-black bg-slate-100 text-slate-800">${totalItemQty.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</td>
                                     <td class="p-1 text-center w-10">
                                         <button onclick="deleteRow('${p.id}')" class="text-red-500 hover:text-red-700 transition"><i data-lucide="trash-2" class="w-3.5 h-3.5 inline"></i></button>
                                     </td>
@@ -1862,9 +1863,7 @@
                                     <div class="flex flex-col">
                                         <div class="flex items-center gap-2 flex-wrap">
                                             <span class="font-bold text-slate-900">${p.name}</span>
-                                            ${changedToday ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-800 border border-amber-300 animate-pulse-soft"><i data-lucide="bell" class="w-2.5 h-2.5 mr-1"></i>Alterado Hoje</span>` : ''}
                                         </div>
-                                        ${isQtyUpdatedByAdmin ? `<span class="text-[10px] text-blue-700 bg-blue-50 font-mono px-1.5 py-0.5 rounded mt-1 max-w-max border border-blue-200"><strong>Modificado por Central:</strong> ${p.updatedBy}</span>` : ''}
                                     </div>
                                 </td>
                                 <td class="p-3 text-slate-400 font-medium font-mono text-xs">R$ ${formatBRLString(p.cost || 0)}</td>
@@ -1875,9 +1874,11 @@
                                     </div>
                                 </td>
                                 <td class="p-3 bg-blue-50/10 text-right w-44">
-                                    <input type="number" min="0" value="${currentQty}" 
-                                        oninput="updateStoreQuantity('${p.id}', this.value)" 
-                                        placeholder="0" 
+                                    <input type="number" min="0" step="0.5" value="${currentQty}"
+                                        inputmode="decimal"
+                                        oninput="updateStoreQuantity('${p.id}', this.value)"
+                                        placeholder="0"
+                                        data-testid="store-qty-input-${p.id}"
                                         class="w-24 px-2 py-1 text-center font-bold border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-400 text-sm bg-white text-blue-950">
                                 </td>
                             </tr>
@@ -2027,10 +2028,16 @@
             let total = 0;
             Object.keys(orders).forEach(pid => {
                 const p = window.state.products.find(x => x.id === pid);
-                if (p && validSuppliers.has(p.supplier)) total += orders[pid];
+                if (p && validSuppliers.has(p.supplier)) total += (parseFloat(orders[pid]) || 0);
             });
             const badge = document.getElementById("badge-total-items");
-            if(total > 0) { badge.innerText = total; badge.classList.remove("hidden"); } else { badge.classList.add("hidden"); }
+            if(total > 0) {
+                // Exibe com vírgula decimal se for fracionado (ex: 3,5)
+                badge.innerText = total.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                badge.classList.remove("hidden");
+            } else {
+                badge.classList.add("hidden");
+            }
         }
 
         window.reviewOrder = function() {
@@ -2053,13 +2060,14 @@
 
             items.forEach(pid => {
                 const p = window.state.products.find(prod => prod.id === pid);
-                const qty = storeOrders[pid];
+                const qty = parseFloat(storeOrders[pid]) || 0;
                 const price = getPriceForStore(p, currentStore);
                 if (price === null) return;
                 const subtotal = price * qty;
                 totalPedido += subtotal;
 
-                html += `<tr><td class="p-2.5"><div class="font-bold text-slate-950">${p.name}</div><div class="text-[10px] text-slate-400">${p.supplier}</div></td><td class="p-2.5 text-center font-bold text-blue-900 bg-blue-50">${qty}</td><td class="p-2.5 text-right">R$ ${formatBRLString(price)}</td><td class="p-2.5 text-right font-bold text-emerald-700">R$ ${formatBRLString(subtotal)}</td></tr>`;
+                const qtyDisplay = qty.toLocaleString('pt-BR', { maximumFractionDigits: 2 });
+                html += `<tr><td class="p-2.5"><div class="font-bold text-slate-950">${p.name}</div><div class="text-[10px] text-slate-400">${p.supplier}</div></td><td class="p-2.5 text-center font-bold text-blue-900 bg-blue-50">${qtyDisplay}</td><td class="p-2.5 text-right">R$ ${formatBRLString(price)}</td><td class="p-2.5 text-right font-bold text-emerald-700">R$ ${formatBRLString(subtotal)}</td></tr>`;
             });
 
             html += `</tbody></table><div class="pt-4 border-t border-slate-200 flex justify-between items-center"><span class="text-slate-600 font-bold text-xs">Total do Pedido:</span><span class="text-lg font-black text-emerald-800">R$ ${formatBRLString(totalPedido)}</span></div>`;
