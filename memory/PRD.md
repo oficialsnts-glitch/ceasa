@@ -17,6 +17,15 @@ App full HTML (single-file `index.html`) com Firebase (Auth + Firestore) para ge
 - **Compradores (store)**: fazem pedidos por filial (Madri, Oeste, Solange, Parque Oeste)
 
 ## Implemented
+- 2026-01-20: **Histórico de alteração do Preço de Venda no card "Fazer Pedido"**
+  - Cada mudança do `saleAll` (Todas as Lojas) ou de um item de `multiPrices` grava uma entrada em `products/{id}.priceHistory` via `arrayUnion` — nunca sobrescreve; histórico cresce por dia.
+  - Estrutura da entrada: `{ prev, next, ts, date, time, user, stores }` — `stores = "all"` ou array com as filiais afetadas por aquela regra multi.
+  - No card do comprador, ao lado do "Preço Venda" aparece badge inline `R$ 5,00 → R$ 6,50` com seta ↗ (rosa) ou ↘ (verde) refletindo alta/baixa. Tooltip lista todas as alterações do dia com horário e usuário.
+  - Abaixo da linha, tabela expansível "Histórico do dia" com hora, valor anterior riscado, valor atual e diferença (+/− R$).
+  - Banner de notificação no topo (com ícone `bell-ring` pulsante) mostra "N preço(s) de venda alterado(s) hoje", botões `Ver alterações` (rola até a primeira mudança + destaque em ring âmbar) e `X` (dismiss).
+  - Beep sonoro suave via Web Audio (dois tons ascendentes 880Hz→1175Hz) toca UMA vez por sessão de login, também dispara ao trocar de loja no seletor multi-loja.
+  - Filtro por loja: em `multiPrices`, o histórico só conta como alteração do dia para o comprador se sua filial estiver na lista `stores` daquela regra.
+  - Somente alterações de HOJE são exibidas na UI; entradas antigas permanecem no array como auditoria.
 - 2026-01-20: **Cards do ADM iniciam fechados + ordenação alfabética**
   - Todos os cards de fornecedor no painel ADM começam **fechados**; abrem apenas com clique no header (evita scroll infinito ao entrar na Home com muitos fornecedores)
   - Cada card exibe badge com **contador de produtos** ao lado do nome

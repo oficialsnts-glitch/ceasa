@@ -445,6 +445,31 @@
         </div>
 
         <main class="flex-1 p-3 md:p-6 max-w-6xl w-full mx-auto">
+            <!-- Banner de alerta de alterações de preço no dia -->
+            <div id="price-change-banner" data-testid="price-change-banner" class="hidden mb-4 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-yellow-50 shadow-sm overflow-hidden">
+                <div class="flex items-start gap-3 p-3 md:p-4">
+                    <div class="p-2 bg-amber-500 text-white rounded-lg shrink-0 animate-pulse-soft">
+                        <i data-lucide="bell-ring" class="w-5 h-5"></i>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="font-bold text-amber-900 text-sm md:text-base">
+                            <span id="price-change-banner-count">0</span> preço(s) de venda alterado(s) hoje
+                        </p>
+                        <p class="text-[11px] md:text-xs text-amber-800 mt-0.5">
+                            Confira as alterações antes de finalizar seus pedidos — ajuste os valores nas suas vendas para não sair com preço desatualizado.
+                        </p>
+                    </div>
+                    <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2 shrink-0">
+                        <button onclick="scrollToFirstPriceChange()" data-testid="view-price-changes-btn" class="bg-amber-600 hover:bg-amber-700 text-white text-[11px] md:text-xs font-bold px-3 py-2 rounded-lg shadow transition inline-flex items-center gap-1.5 whitespace-nowrap">
+                            <i data-lucide="eye" class="w-3.5 h-3.5"></i> Ver alterações
+                        </button>
+                        <button onclick="dismissPriceChangeBanner()" data-testid="dismiss-price-changes-btn" class="text-amber-700 hover:text-amber-900 border border-amber-300 hover:bg-amber-100 text-[11px] md:text-xs font-bold px-2.5 py-2 rounded-lg transition inline-flex items-center gap-1 whitespace-nowrap">
+                            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div id="store-area-order" class="block space-y-4"></div>
             <div id="store-area-prices" class="hidden space-y-4">
                 <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs text-amber-950 flex items-center gap-2">
@@ -488,7 +513,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
-            getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, addDoc, deleteDoc, query, where, getDocs, deleteField
+            getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, addDoc, deleteDoc, query, where, getDocs, deleteField, arrayUnion
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { 
             getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged 
@@ -684,6 +709,9 @@
                 switchAdminTab("home");
             } else {
                 document.getElementById("screen-store").classList.remove("hidden");
+                // Reset da notificação sonora por sessão de login
+                window.state.priceAlertPlayed = false;
+                window.state.priceBannerDismissed = false;
                 // Configura loja ativa e seletor multi-loja
                 const u = window.state.currentUser;
                 const allowed = (u.allowedStores && u.allowedStores.length) ? u.allowedStores : (u.storeName ? [u.storeName] : []);
@@ -708,6 +736,9 @@
             if (!allowed.includes(storeName)) return alert("Você não tem permissão para esta loja.");
             window.state.currentUser.storeName = storeName;
             document.getElementById("display-store-name").innerText = `Filial: ${storeName}`;
+            // Ao trocar de loja, reseta o alerta para tocar novamente com as alterações da nova loja
+            window.state.priceAlertPlayed = false;
+            window.state.priceBannerDismissed = false;
             refreshUI();
         };
 
@@ -1173,6 +1204,79 @@
         }
 
         // ============================================================
+        //  HISTÓRICO DE ALTERAÇÃO DE PREÇO DE VENDA
+        //  - Salva cada mudança de saleAll (Todas as Lojas) ou de um
+        //    item de multiPrices no array `priceHistory` do produto.
+        //  - Cada entrada: { prev, next, ts, date, time, user, stores }
+        //    `stores` = "all" (afeta todas) ou array de nomes das lojas.
+        // ============================================================
+        window.__todayStr = function() {
+            const t = new Date();
+            return `${String(t.getDate()).padStart(2,'0')}/${String(t.getMonth()+1).padStart(2,'0')}/${t.getFullYear()}`;
+        };
+
+        async function pushPriceHistory(productId, prev, next, stores) {
+            const now = new Date();
+            const date = window.__todayStr();
+            const time = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+            const entry = {
+                prev: Number(prev) || 0,
+                next: Number(next) || 0,
+                ts: `${date} ${time}`,
+                date,
+                time,
+                user: (window.state.currentUser && window.state.currentUser.name) || "ADM",
+                stores: stores // "all" ou array de nomes
+            };
+            try {
+                await updateDoc(doc(db, "products", productId), {
+                    priceHistory: arrayUnion(entry)
+                });
+            } catch (err) {
+                console.warn("Falha ao registrar histórico de preço:", err);
+            }
+        }
+
+        // Retorna todas as alterações do produto que aconteceram HOJE
+        // e que afetam a loja passada (ou todas as lojas).
+        window.getTodayPriceHistoryForStore = function(product, storeName) {
+            const today = window.__todayStr();
+            const hist = (product.priceHistory || []).filter(h => {
+                if (!h || h.date !== today) return false;
+                if (h.stores === "all") return true;
+                if (Array.isArray(h.stores)) return h.stores.includes(storeName);
+                return false;
+            });
+            // Ordena por horário crescente
+            return hist.sort((a,b) => (a.time || "").localeCompare(b.time || ""));
+        };
+
+        // Beep suave via Web Audio (sem dependência externa).
+        window.__playPriceAlert = function() {
+            try {
+                const AC = window.AudioContext || window.webkitAudioContext;
+                if (!AC) return;
+                const ctx = new AC();
+                const notes = [880, 1175]; // dois bipes curtos ascendentes
+                notes.forEach((freq, i) => {
+                    const o = ctx.createOscillator();
+                    const g = ctx.createGain();
+                    o.type = "sine";
+                    o.frequency.value = freq;
+                    g.gain.value = 0.0001;
+                    o.connect(g).connect(ctx.destination);
+                    const start = ctx.currentTime + i * 0.22;
+                    o.start(start);
+                    g.gain.exponentialRampToValueAtTime(0.18, start + 0.03);
+                    g.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+                    o.stop(start + 0.2);
+                });
+                setTimeout(() => { try { ctx.close(); } catch(_){} }, 900);
+            } catch (_) { /* ignore */ }
+        };
+
+
+        // ============================================================
         //  MÁSCARA DE DINHEIRO (BRL)
         //  - Digita da direita pra esquerda: os dígitos vão preenchendo
         //    os centavos automaticamente. Sem precisar apagar zeros nem
@@ -1264,7 +1368,22 @@
                 updateObj['cost'] = bPrice / (uQty || 1);
             }
 
+            // Captura o preço de venda anterior ANTES do write para registrar histórico
+            let prevSaleAll = null;
+            if (field === 'saleAll') {
+                const prod = window.state.products.find(p => p.id === productId);
+                prevSaleAll = Number(prod?.saleAll) || 0;
+            }
+
             await updateDoc(doc(db, "products", productId), updateObj);
+
+            // Registra histórico do preço de venda geral (Todas as Lojas)
+            if (field === 'saleAll') {
+                const newVal = Number(updateObj.saleAll) || 0;
+                if (prevSaleAll !== null && Math.abs(prevSaleAll - newVal) > 0.0001) {
+                    await pushPriceHistory(productId, prevSaleAll, newVal, "all");
+                }
+            }
         };
 
         window.updateStoreQuantityFromAdmin = async function(storeName, productId, val) {
@@ -1303,12 +1422,19 @@
         window.updateMultiValue = async function(productId, idx, val) {
             const prod = window.state.products.find(p => p.id === productId);
             const arr = [...prod.multiPrices];
-            arr[idx].value = parseBRL(val);
+            const prevValue = Number(arr[idx]?.value) || 0;
+            const affectedStores = Array.isArray(arr[idx]?.stores) ? [...arr[idx].stores] : [];
+            const newValue = parseBRL(val);
+            arr[idx].value = newValue;
             await updateDoc(doc(db, "products", productId), { 
                 multiPrices: arr,
                 lastUpdate: getTimestamp(),
                 updatedBy: window.state.currentUser.name
             });
+            // Registra histórico apenas quando há lojas afetadas e o valor mudou
+            if (affectedStores.length && Math.abs(prevValue - newValue) > 0.0001) {
+                await pushPriceHistory(productId, prevValue, newValue, affectedStores);
+            }
         };
 
         window.toggleStoreInRule = async function(productId, idx, store) {
@@ -1629,17 +1755,26 @@
 
             const validSuppliers = new Set(window.state.suppliers);
             const grouped = {};
+            let totalChangedToday = 0;
+            const changedProductIds = [];
+
             window.state.products.forEach(p => {
                 // Ignora produtos cujo fornecedor não existe mais no Firestore (órfãos)
                 if (!validSuppliers.has(p.supplier)) return;
                 const price = getPriceForStore(p, currentStore);
                 if(price === null) return; 
                 if(!grouped[p.supplier]) grouped[p.supplier] = [];
-                grouped[p.supplier].push({ product: p, price });
+                const history = window.getTodayPriceHistoryForStore(p, currentStore);
+                if (history.length) {
+                    totalChangedToday += 1;
+                    changedProductIds.push(p.id);
+                }
+                grouped[p.supplier].push({ product: p, price, history });
             });
 
             if(Object.keys(grouped).length === 0) {
                 container.innerHTML = `<div class="bg-white p-8 border border-slate-200 rounded-xl text-center text-slate-500 shadow-sm">Nenhum produto liberado para sua filial.</div>`;
+                updatePriceChangeBanner(0, []);
                 return;
             }
 
@@ -1654,20 +1789,78 @@
                     grouped[supplier].forEach(item => {
                         const p = item.product;
                         const finalPrice = item.price;
+                        const history = item.history || [];
+                        const hasHistoryToday = history.length > 0;
                         const currentQty = (window.state.orders[currentStore] && window.state.orders[currentStore][p.id]) ? window.state.orders[currentStore][p.id] : "";
                         
-                        const changedToday = isUpdatedToday(p.lastUpdate);
+                        // "Alterado hoje" agora prioriza o histórico específico de preço de venda
+                        const changedToday = hasHistoryToday || isUpdatedToday(p.lastUpdate);
                         const isQtyUpdatedByAdmin = p.updatedBy?.includes("(ADM)");
 
                         const trClass = changedToday 
                             ? "row-highlight bg-amber-50/60 border-l-4 border-l-amber-500 hover:bg-amber-100/70 border-b border-slate-200 transition" 
                             : "hover:bg-slate-50 transition border-b border-slate-200";
 
+                        // Badge inline com anterior → atual (usa o primeiro preço do dia como "anterior")
+                        // e o preço atual como destino final da variação.
+                        let priceChangeBadge = "";
+                        let historyCardHtml = "";
+                        if (hasHistoryToday) {
+                            const firstPrev = Number(history[0].prev) || 0;
+                            const lastNext = Number(history[history.length - 1].next) || finalPrice;
+                            const wentUp = lastNext > firstPrev;
+                            const arrowIcon = wentUp ? "trending-up" : "trending-down";
+                            const badgeCls = wentUp
+                                ? "bg-rose-50 text-rose-700 border-rose-300"
+                                : "bg-emerald-50 text-emerald-700 border-emerald-300";
+                            const tooltipTxt = history.map(h => `${h.time} • R$ ${formatBRLString(h.prev)} → R$ ${formatBRLString(h.next)} (${h.user})`).join("\n");
+                            priceChangeBadge = `
+                                <span title="${tooltipTxt.replace(/"/g,'&quot;')}"
+                                    class="inline-flex items-center gap-1 px-2 py-0.5 rounded border ${badgeCls} text-[10px] font-bold font-mono whitespace-nowrap">
+                                    <i data-lucide="${arrowIcon}" class="w-3 h-3"></i>
+                                    R$ ${formatBRLString(firstPrev)} → R$ ${formatBRLString(lastNext)}
+                                </span>
+                            `;
+
+                            // Card expansível com todo o histórico do dia
+                            const items = history.map(h => {
+                                const diff = (Number(h.next) || 0) - (Number(h.prev) || 0);
+                                const diffCls = diff > 0 ? "text-rose-600" : (diff < 0 ? "text-emerald-600" : "text-slate-500");
+                                const diffSign = diff > 0 ? "+" : "";
+                                return `
+                                    <div class="flex items-center justify-between gap-2 py-1.5 border-b border-amber-100 last:border-0 text-[11px]">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-mono font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">${h.time}</span>
+                                            <span class="text-slate-500 line-through">R$ ${formatBRLString(h.prev)}</span>
+                                            <i data-lucide="arrow-right" class="w-3 h-3 text-amber-600"></i>
+                                            <span class="text-slate-900 font-bold">R$ ${formatBRLString(h.next)}</span>
+                                            <span class="${diffCls} font-bold text-[10px]">(${diffSign}R$ ${formatBRLString(Math.abs(diff))})</span>
+                                        </div>
+                                        <span class="text-slate-500 text-[10px]">por ${h.user || '—'}</span>
+                                    </div>
+                                `;
+                            }).join('');
+
+                            historyCardHtml = `
+                                <tr class="bg-amber-50/40 border-b border-slate-200" id="history-row-${p.id}">
+                                    <td colspan="4" class="p-3">
+                                        <div class="border border-amber-200 bg-white rounded-lg overflow-hidden">
+                                            <div class="px-3 py-1.5 bg-amber-100 text-amber-900 text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
+                                                <i data-lucide="history" class="w-3 h-3"></i>
+                                                Histórico do dia — ${history.length} alteração(ões)
+                                            </div>
+                                            <div class="px-3 py-1">${items}</div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `;
+                        }
+
                         rows += `
-                            <tr class="${trClass}">
+                            <tr class="${trClass}" data-product-row="${p.id}">
                                 <td class="p-3">
                                     <div class="flex flex-col">
-                                        <div class="flex items-center gap-2">
+                                        <div class="flex items-center gap-2 flex-wrap">
                                             <span class="font-bold text-slate-900">${p.name}</span>
                                             ${changedToday ? `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-200 text-amber-800 border border-amber-300 animate-pulse-soft"><i data-lucide="bell" class="w-2.5 h-2.5 mr-1"></i>Alterado Hoje</span>` : ''}
                                         </div>
@@ -1676,7 +1869,10 @@
                                 </td>
                                 <td class="p-3 text-slate-400 font-medium font-mono text-xs">R$ ${formatBRLString(p.cost || 0)}</td>
                                 <td class="p-3 font-semibold text-emerald-700 font-mono">
-                                    <span class="${changedToday ? 'text-amber-700 bg-amber-100 px-1 rounded font-bold' : ''}">R$ ${formatBRLString(finalPrice)}</span>
+                                    <div class="flex flex-col gap-1">
+                                        <span class="${hasHistoryToday ? 'text-amber-700 bg-amber-100 px-1 rounded font-bold' : ''}">R$ ${formatBRLString(finalPrice)}</span>
+                                        ${priceChangeBadge}
+                                    </div>
                                 </td>
                                 <td class="p-3 bg-blue-50/10 text-right w-44">
                                     <input type="number" min="0" value="${currentQty}" 
@@ -1685,6 +1881,7 @@
                                         class="w-24 px-2 py-1 text-center font-bold border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-400 text-sm bg-white text-blue-950">
                                 </td>
                             </tr>
+                            ${historyCardHtml}
                         `;
                     });
 
@@ -1719,7 +1916,68 @@
                 `;
             }
             updateCartBadge();
+            updatePriceChangeBanner(totalChangedToday, changedProductIds);
         }
+
+        // Atualiza o banner de alerta de alterações de preço no dia.
+        // Toca o som apenas uma vez por sessão (no primeiro render com alterações).
+        function updatePriceChangeBanner(count, changedIds) {
+            const banner = document.getElementById("price-change-banner");
+            const countEl = document.getElementById("price-change-banner-count");
+            if (!banner || !countEl) return;
+
+            window.state.priceChangedIdsToday = changedIds || [];
+
+            if (window.state.priceBannerDismissed) {
+                banner.classList.add("hidden");
+                return;
+            }
+
+            if (count > 0) {
+                countEl.innerText = count;
+                banner.classList.remove("hidden");
+                if (!window.state.priceAlertPlayed) {
+                    window.state.priceAlertPlayed = true;
+                    // Beep + toast reforçando a notificação sonora
+                    window.__playPriceAlert && window.__playPriceAlert();
+                    if (typeof showToast === "function") {
+                        showToast(`🔔 ${count} preço(s) de venda alterado(s) hoje`);
+                    }
+                }
+                lucide.createIcons();
+            } else {
+                banner.classList.add("hidden");
+            }
+        }
+
+        window.dismissPriceChangeBanner = function() {
+            window.state.priceBannerDismissed = true;
+            const banner = document.getElementById("price-change-banner");
+            if (banner) banner.classList.add("hidden");
+        };
+
+        window.scrollToFirstPriceChange = function() {
+            const ids = window.state.priceChangedIdsToday || [];
+            if (!ids.length) return;
+            // Garante a aba "Fazer Pedido" ativa antes de rolar
+            if (window.state.activeTab !== 'order') {
+                switchStoreCard('order');
+            }
+            // Garante que o fornecedor do primeiro item esteja expandido
+            const first = window.state.products.find(p => p.id === ids[0]);
+            if (first && window.state.expandedStore[first.supplier] === false) {
+                window.state.expandedStore[first.supplier] = true;
+                renderStoreCatalog();
+            }
+            setTimeout(() => {
+                const el = document.querySelector(`[data-product-row="${ids[0]}"]`);
+                if (el) {
+                    el.scrollIntoView({ behavior: "smooth", block: "center" });
+                    el.classList.add("ring-2", "ring-amber-500");
+                    setTimeout(() => el.classList.remove("ring-2", "ring-amber-500"), 1800);
+                }
+            }, 80);
+        };
 
         function renderPricesLogsCard() {
             const currentStore = window.state.currentUser.storeName;
