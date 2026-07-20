@@ -74,22 +74,39 @@
             </div>
         </header>
 
-        <!-- Barra de Ações Rápidas -->
-        <div class="bg-white border-b border-slate-200 p-4 flex flex-wrap gap-4 items-center justify-between shadow-sm">
-            <div class="flex flex-wrap gap-3 items-center">
-                <select id="add-target-supplier" class="px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 bg-slate-50 font-mono"></select>
-                <button onclick="addNewRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded flex items-center gap-1.5 shadow transition">
-                    <i data-lucide="plus-square" class="w-4 h-4"></i> Inserir Produto
-                </button>
-            </div>
-            <div class="flex flex-wrap gap-2">
-                <input type="text" id="quick-supplier" placeholder="Novo Fornecedor" class="px-2 py-1 text-xs border border-slate-300 rounded font-mono focus:ring-1 focus:ring-emerald-500 outline-none">
-                <button onclick="quickAddSupplier()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1 rounded transition">Cadastrar Fornecedor</button>
-            </div>
-        </div>
+        <!-- MENU DE NAVEGAÇÃO ADMIN -->
+        <nav class="bg-white border-b border-slate-200 px-6 flex items-center gap-1 shadow-sm sticky top-0 z-20">
+            <button id="admtab-home" data-testid="admtab-home-btn" onclick="switchAdminTab('home')"
+                class="flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 border-emerald-600 text-emerald-700 transition">
+                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                <span>Tela Inicial</span>
+            </button>
+            <button id="admtab-cadastro" data-testid="admtab-cadastro-btn" onclick="switchAdminTab('cadastro')"
+                class="flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition">
+                <i data-lucide="user-plus" class="w-4 h-4"></i>
+                <span>Cadastro de Usuários</span>
+            </button>
+        </nav>
 
-        <!-- GERENCIAMENTO DE COMPRADORES E ADMS -->
-        <div class="p-4 max-w-full">
+        <!-- ============ ABA: TELA INICIAL (Ações rápidas + Painel de produtos) ============ -->
+        <section id="admview-home" data-testid="admview-home">
+            <!-- Barra de Ações Rápidas -->
+            <div class="bg-white border-b border-slate-200 p-4 flex flex-wrap gap-4 items-center justify-between shadow-sm">
+                <div class="flex flex-wrap gap-3 items-center">
+                    <select id="add-target-supplier" class="px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 bg-slate-50 font-mono"></select>
+                    <button onclick="addNewRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded flex items-center gap-1.5 shadow transition">
+                        <i data-lucide="plus-square" class="w-4 h-4"></i> Inserir Produto
+                    </button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <input type="text" id="quick-supplier" placeholder="Novo Fornecedor" class="px-2 py-1 text-xs border border-slate-300 rounded font-mono focus:ring-1 focus:ring-emerald-500 outline-none">
+                    <button onclick="quickAddSupplier()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1 rounded transition">Cadastrar Fornecedor</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ ABA: CADASTRO DE USUÁRIOS (oculta por padrão) ============ -->
+        <section id="admview-cadastro" data-testid="admview-cadastro" class="hidden p-4 max-w-full">
             <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-6">
                 <div class="bg-slate-700 text-white px-4 py-2.5 flex items-center space-x-2">
                     <i data-lucide="users" class="w-4 h-4 text-sky-400"></i>
@@ -151,9 +168,9 @@
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <main class="flex-1 p-4 overflow-auto space-y-4" id="admin-cards-container">
+        <main class="flex-1 p-4 overflow-auto space-y-4" id="admin-cards-container" data-admview="home">
             <div class="text-center py-8 text-slate-500 text-xs">Carregando painel principal...</div>
         </main>
     </div>
@@ -425,6 +442,7 @@
                 document.getElementById("screen-admin").classList.remove("hidden");
                 document.getElementById("adm-display-user").innerText = `ADM: ${window.state.currentUser.name}`;
                 updateAdminFormStoreSelect();
+                switchAdminTab("home");
             } else {
                 document.getElementById("screen-store").classList.remove("hidden");
                 document.getElementById("display-store-name").innerText = `Filial: ${window.state.currentUser.storeName}`;
@@ -503,6 +521,37 @@
 
         window.logout = function() {
             signOut(auth);
+        };
+
+        // --- NAVEGAÇÃO ENTRE ABAS DO PAINEL ADMIN ---
+        window.switchAdminTab = function(tab) {
+            const homeView = document.getElementById("admview-home");
+            const homeMain = document.getElementById("admin-cards-container");
+            const cadastroView = document.getElementById("admview-cadastro");
+            const homeBtn = document.getElementById("admtab-home");
+            const cadastroBtn = document.getElementById("admtab-cadastro");
+
+            const activeCls = ["border-emerald-600", "text-emerald-700"];
+            const inactiveCls = ["border-transparent", "text-slate-500", "hover:text-slate-800", "hover:bg-slate-50"];
+
+            if (tab === "cadastro") {
+                homeView.classList.add("hidden");
+                homeMain.classList.add("hidden");
+                cadastroView.classList.remove("hidden");
+                cadastroBtn.classList.add(...activeCls);
+                cadastroBtn.classList.remove(...inactiveCls);
+                homeBtn.classList.remove(...activeCls);
+                homeBtn.classList.add(...inactiveCls);
+            } else {
+                cadastroView.classList.add("hidden");
+                homeView.classList.remove("hidden");
+                homeMain.classList.remove("hidden");
+                homeBtn.classList.add(...activeCls);
+                homeBtn.classList.remove(...inactiveCls);
+                cadastroBtn.classList.remove(...activeCls);
+                cadastroBtn.classList.add(...inactiveCls);
+            }
+            lucide.createIcons();
         };
 
         // --- GERENCIAMENTO DE ACESSOS PELO ADM ---
