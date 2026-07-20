@@ -490,10 +490,7 @@
                 window.state.supplierDocs = snapshot.docs.map(d => ({ id: d.id, name: d.data().name }))
                     .sort((a, b) => a.name.localeCompare(b.name));
                 window.state.suppliers = window.state.supplierDocs.map(s => s.name);
-                if (window.state.suppliers.length === 0) {
-                    window.state.suppliers = ["Hortifruti Central", "Pomar Vale"];
-                }
-                
+
                 window.state.suppliers.forEach(s => {
                     if (window.state.expandedAdmin[s] === undefined) window.state.expandedAdmin[s] = true;
                     if (window.state.expandedStore[s] === undefined) window.state.expandedStore[s] = true;
@@ -1138,9 +1135,28 @@
         }
 
         function renderAdminDashboard() {
-            document.getElementById("add-target-supplier").innerHTML = window.state.suppliers.map(s => `<option value="${s}">${s}</option>`).join('');
+            document.getElementById("add-target-supplier").innerHTML = window.state.suppliers.length
+                ? window.state.suppliers.map(s => `<option value="${s}">${s}</option>`).join('')
+                : `<option value="">Nenhum fornecedor cadastrado</option>`;
             const container = document.getElementById("admin-cards-container");
             container.innerHTML = "";
+
+            if (window.state.suppliers.length === 0) {
+                container.innerHTML = `
+                    <div class="bg-white border-2 border-dashed border-slate-300 rounded-xl p-10 text-center">
+                        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 mb-3">
+                            <i data-lucide="truck" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-sm mb-1">Nenhum fornecedor cadastrado ainda</h3>
+                        <p class="text-xs text-slate-500 mb-4">Vá até a aba <strong>Cadastros</strong> para adicionar seu primeiro fornecedor e começar a inserir produtos.</p>
+                        <button onclick="switchAdminTab('cadastro')" class="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded shadow transition">
+                            <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Ir para Cadastros
+                        </button>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
 
             window.state.suppliers.forEach(supplier => {
                 const isExpanded = window.state.expandedAdmin[supplier] !== false;
