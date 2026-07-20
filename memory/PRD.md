@@ -17,6 +17,15 @@ App full HTML (single-file `index.html`) com Firebase (Auth + Firestore) para ge
 - **Compradores (store)**: fazem pedidos por filial (Madri, Oeste, Solange, Parque Oeste)
 
 ## Implemented
+- 2026-01-20: **Formulário de inserção rápida na Home**
+  - Barra de ações agora contém: Fornecedor, Nome do Produto, Preço de Compra (com máscara BRL), Quantidade e Unidade (un/kg/g/cx/dz/sc/L/ml/pct)
+  - Ao clicar "Inserir Produto" o item é gravado no Firestore já com todos os campos preenchidos e o Custo Unitário recalculado
+  - Formulário reseta e foca no Nome para inserção contínua rápida
+- 2026-01-20: **Máscara de dinheiro BRL** (`formatBRL` / `parseBRL` / `formatBRLString`)
+  - Digitação da direita pra esquerda: `1` → `0,01`, `12345` → `123,45`, `1000000` → `10.000,00`
+  - Sem necessidade de apagar zeros ou digitar vírgula manualmente
+  - Aplicada a: novo Preço de Compra na Home, Preço de Compra por linha, Preço de Venda Geral, Preço Multi por loja
+  - Exibição consistente em pt-BR (custo unitário, tabela de preços, modal de resumo do pedido)
 - 2026-01-20: Auto-bootstrap do ADM master `oficialsnts@gmail.com`
 - 2026-01-20: **PWA completo** (imagem, instalação, mobile)
   - Ícone gerado via **Gemini Nano Banana** — caixa de madeira com hortifruti sobre gradiente esmeralda
