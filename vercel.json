@@ -2,7 +2,29 @@
   "buildCommand": null,
   "outputDirectory": "./",
   "cleanUrls": true,
+  "headers": [
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
+      "source": "/manifest.webmanifest",
+      "headers": [
+        { "key": "Content-Type", "value": "application/manifest+json; charset=utf-8" },
+        { "key": "Cache-Control", "value": "public, max-age=3600" }
+      ]
+    },
+    {
+      "source": "/icons/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ],
   "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/((?!icons/|sw\\.js|manifest\\.webmanifest|offline\\.html|favicon\\.ico|.*\\.(?:png|jpg|jpeg|svg|webp|ico|js|css|json|webmanifest|txt|xml)).*)", "destination": "/index.html" }
   ]
 }

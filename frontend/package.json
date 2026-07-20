@@ -1,0 +1,11 @@
+{
+  "name": "ceasa-static-server",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "serve -s /app -l tcp://0.0.0.0:3000 --no-clipboard --cors"
+  },
+  "dependencies": {
+    "serve": "14.2.4"
+  }
+}

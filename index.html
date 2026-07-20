@@ -2,11 +2,36 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0">
+    <meta name="format-detection" content="telephone=no">
     <title>CEASA - Central de Pedidos e Preços</title>
+
+    <!-- ============ PWA META ============ -->
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#047857">
+    <meta name="application-name" content="CEASA">
+    <meta name="description" content="Central de pedidos e preços entre filiais e fornecedores de hortifruti.">
+    <!-- iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CEASA">
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png">
+    <link rel="shortcut icon" href="/icons/favicon.ico">
+    <!-- Microsoft -->
+    <meta name="msapplication-TileColor" content="#047857">
+    <meta name="msapplication-TileImage" content="/icons/icon-192.png">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        html, body { -webkit-tap-highlight-color: transparent; }
+        body {
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
         .excel-input:focus {
             background-color: #fef08a !important;
             outline: 2px solid #eab308;
@@ -18,9 +43,74 @@
         .animate-pulse-soft {
             animation: pulse-soft 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+
+        /* ========= MOBILE FIRST OTIMIZAÇÕES ========= */
+        /* Rolagem horizontal com inércia iOS e faixa de "peek" para indicar mais colunas */
+        .scroll-x {
+            -webkit-overflow-scrolling: touch;
+            overflow-x: auto;
+            overscroll-behavior-x: contain;
+            scrollbar-width: thin;
+            background:
+              linear-gradient(90deg, #fff 30%, rgba(255,255,255,0)) left center / 24px 100% no-repeat,
+              linear-gradient(90deg, rgba(255,255,255,0), #fff 70%) right center / 24px 100% no-repeat,
+              radial-gradient(6px at 4px 50%, rgba(0,0,0,.12), transparent) left center / 20px 100% no-repeat,
+              radial-gradient(6px at calc(100% - 4px) 50%, rgba(0,0,0,.12), transparent) right center / 20px 100% no-repeat;
+            background-attachment: local, local, scroll, scroll;
+        }
+        .scroll-x::-webkit-scrollbar { height: 8px; }
+        .scroll-x::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        .scroll-x table { min-width: max-content; }
+
+        /* Primeira coluna sticky em tabelas grandes (nome do produto) */
+        .table-sticky-first thead th:first-child,
+        .table-sticky-first tbody td:first-child { position: sticky; left: 0; z-index: 3; background: #fff; box-shadow: 2px 0 4px -2px rgba(0,0,0,.15); }
+        .table-sticky-first thead th:first-child { background: #f1f5f9; z-index: 4; }
+
+        /* Melhor tap targets no mobile */
+        @media (max-width: 768px) {
+            input, select, button, textarea { font-size: 16px !important; } /* evita zoom no iOS */
+            .mobile-compact-header h2 { font-size: 15px !important; }
+            .mobile-hide { display: none !important; }
+            .mobile-full { width: 100% !important; }
+            .mobile-stack { flex-direction: column !important; align-items: stretch !important; gap: 8px !important; }
+            .mobile-p-sm { padding: 8px !important; }
+        }
+
+        /* Botão flutuante de instalar PWA */
+        #pwa-install-btn {
+            position: fixed; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+            z-index: 60;
+            background: #047857; color: #fff;
+            font-weight: 700; font-size: 13px;
+            padding: 10px 16px; border-radius: 999px;
+            box-shadow: 0 10px 20px rgba(4,120,87,.35);
+            display: none; align-items: center; gap: 8px;
+            border: 1px solid rgba(255,255,255,.25);
+            transition: transform .15s;
+        }
+        #pwa-install-btn:active { transform: translateY(1px); }
+
+        /* Toast simples */
+        #app-toast {
+            position: fixed; left: 50%; transform: translateX(-50%);
+            bottom: calc(20px + env(safe-area-inset-bottom));
+            background: rgba(15,23,42,.94); color: #fff;
+            padding: 10px 16px; border-radius: 999px;
+            font-size: 13px; font-weight: 600;
+            box-shadow: 0 12px 30px rgba(0,0,0,.35);
+            z-index: 70; display: none;
+        }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 font-sans antialiased min-h-screen">
+
+    <!-- PWA install button (aparece somente quando o navegador dispara beforeinstallprompt) -->
+    <button id="pwa-install-btn" type="button" onclick="window.__pwaInstall && window.__pwaInstall()" data-testid="pwa-install-btn">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        <span>Instalar app</span>
+    </button>
+    <div id="app-toast" data-testid="app-toast"></div>
 
     <!-- ================= TELA DE LOGIN ================= -->
     <div id="screen-login" class="flex items-center justify-center min-h-screen p-4">
@@ -57,25 +147,25 @@
 
     <!-- ================= PAINEL ADMINISTRATIVO ================= -->
     <div id="screen-admin" class="hidden min-h-screen flex flex-col">
-        <header class="bg-emerald-800 text-white px-6 py-3 flex justify-between items-center shadow-md">
-            <div class="flex items-center space-x-3">
-                <i data-lucide="grid" class="w-6 h-6 text-emerald-300"></i>
-                <div>
-                    <h2 class="font-bold text-base tracking-wide uppercase">Planilha Ceasa Master & Monitor de Pedidos</h2>
-                    <p class="text-xs text-emerald-200">Painel de controle total de insumos, preços e acessos de filiais.</p>
+        <header class="bg-emerald-800 text-white px-4 md:px-6 py-3 flex flex-wrap justify-between items-center gap-2 shadow-md mobile-compact-header">
+            <div class="flex items-center space-x-3 min-w-0 flex-1">
+                <i data-lucide="grid" class="w-6 h-6 text-emerald-300 shrink-0"></i>
+                <div class="min-w-0">
+                    <h2 class="font-bold text-base tracking-wide uppercase truncate">Planilha Ceasa Master & Monitor de Pedidos</h2>
+                    <p class="text-xs text-emerald-200 mobile-hide">Painel de controle total de insumos, preços e acessos de filiais.</p>
                 </div>
             </div>
-            <div class="flex items-center space-x-4">
-                <span id="adm-display-user" class="text-xs bg-emerald-700 px-3 py-1.5 rounded border border-emerald-600 font-mono">ADM</span>
-                <button onclick="logout()" class="flex items-center space-x-1 px-3 py-1.5 bg-red-700 hover:bg-red-800 rounded text-xs font-medium transition shadow">
+            <div class="flex items-center space-x-2 md:space-x-4 shrink-0">
+                <span id="adm-display-user" class="text-xs bg-emerald-700 px-2 md:px-3 py-1.5 rounded border border-emerald-600 font-mono truncate max-w-[140px] md:max-w-none">ADM</span>
+                <button onclick="logout()" data-testid="adm-logout-btn" class="flex items-center space-x-1 px-3 py-1.5 bg-red-700 hover:bg-red-800 rounded text-xs font-medium transition shadow">
                     <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
-                    <span>Sair</span>
+                    <span class="mobile-hide">Sair</span>
                 </button>
             </div>
         </header>
 
         <!-- MENU DE NAVEGAÇÃO ADMIN -->
-        <nav class="bg-white border-b border-slate-200 px-6 flex items-center gap-1 shadow-sm sticky top-0 z-20">
+        <nav class="bg-white border-b border-slate-200 px-2 md:px-6 flex items-center gap-1 shadow-sm sticky top-0 z-20 overflow-x-auto">
             <button id="admtab-home" data-testid="admtab-home-btn" onclick="switchAdminTab('home')"
                 class="flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 border-emerald-600 text-emerald-700 transition">
                 <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
@@ -91,15 +181,15 @@
         <!-- ============ ABA: TELA INICIAL (Ações rápidas + Painel de produtos) ============ -->
         <section id="admview-home" data-testid="admview-home">
             <!-- Barra de Ações Rápidas -->
-            <div class="bg-white border-b border-slate-200 p-4 flex flex-wrap gap-4 items-center justify-between shadow-sm">
-                <div class="flex flex-wrap gap-3 items-center">
+            <div class="bg-white border-b border-slate-200 p-3 md:p-4 flex flex-wrap gap-3 md:gap-4 items-center justify-between shadow-sm">
+                <div class="flex flex-wrap gap-2 md:gap-3 items-center w-full sm:w-auto">
                     <label class="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Fornecedor</label>
-                    <select id="add-target-supplier" class="px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 bg-slate-50 font-mono min-w-[180px]"></select>
-                    <button onclick="addNewRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded flex items-center gap-1.5 shadow transition">
+                    <select id="add-target-supplier" data-testid="add-target-supplier" class="px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 bg-slate-50 font-mono min-w-[160px] flex-1 sm:flex-none"></select>
+                    <button onclick="addNewRow()" data-testid="add-new-row-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 md:px-4 py-1.5 rounded flex items-center gap-1.5 shadow transition whitespace-nowrap">
                         <i data-lucide="plus-square" class="w-4 h-4"></i> Inserir Produto
                     </button>
                 </div>
-                <div class="text-[11px] text-slate-500 flex items-center gap-2">
+                <div class="text-[11px] text-slate-500 flex items-center gap-2 mobile-hide">
                     <i data-lucide="info" class="w-3.5 h-3.5"></i>
                     <span>Para cadastrar/editar fornecedores, use a aba <strong>Cadastros</strong>.</span>
                 </div>
@@ -107,7 +197,7 @@
         </section>
 
         <!-- ============ ABA: CADASTROS (Usuários + Fornecedores) ============ -->
-        <section id="admview-cadastro" data-testid="admview-cadastro" class="hidden p-4 max-w-full space-y-6">
+        <section id="admview-cadastro" data-testid="admview-cadastro" class="hidden p-3 md:p-4 max-w-full space-y-6">
             <!-- ============ CARD: USUÁRIOS ============ -->
             <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div class="bg-slate-700 text-white px-4 py-2.5 flex items-center space-x-2">
@@ -177,7 +267,7 @@
                     </form>
 
                     <!-- Lista de Usuários Ativos -->
-                    <div class="lg:grid-cols-1 lg:col-span-2 overflow-x-auto bg-white rounded-xl border border-slate-200">
+                    <div class="lg:grid-cols-1 lg:col-span-2 scroll-x bg-white rounded-xl border border-slate-200">
                         <table class="w-full text-left text-xs font-mono">
                             <thead>
                                 <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 select-none">
@@ -225,7 +315,7 @@
                     </form>
 
                     <!-- Lista de fornecedores -->
-                    <div class="lg:grid-cols-1 lg:col-span-2 overflow-x-auto bg-white rounded-xl border border-slate-200">
+                    <div class="lg:grid-cols-1 lg:col-span-2 scroll-x bg-white rounded-xl border border-slate-200">
                         <table class="w-full text-left text-xs font-mono">
                             <thead>
                                 <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 select-none">
@@ -243,66 +333,67 @@
             </div>
         </section>
 
-        <main class="flex-1 p-4 overflow-auto space-y-4" id="admin-cards-container" data-admview="home">
+        <main class="flex-1 p-3 md:p-4 overflow-auto space-y-4" id="admin-cards-container" data-admview="home">
             <div class="text-center py-8 text-slate-500 text-xs">Carregando painel principal...</div>
         </main>
     </div>
 
     <!-- ================= TELA DA LOJA / FILIAIS ================= -->
     <div id="screen-store" class="hidden min-h-screen flex flex-col bg-slate-50">
-        <header class="bg-white border-b border-slate-200 sticky top-0 z-10 px-6 py-4 flex justify-between items-center shadow-sm">
-            <div class="flex items-center space-x-3">
-                <div class="p-2 bg-blue-600 rounded-lg text-white"><i data-lucide="store" class="w-5 h-5"></i></div>
-                <div>
-                    <h2 class="font-bold text-lg text-slate-900" id="display-store-name">Loja</h2>
-                    <span id="store-display-user" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Comprador</span>
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-10 px-3 md:px-6 py-3 md:py-4 flex flex-wrap justify-between items-center gap-2 shadow-sm">
+            <div class="flex items-center space-x-3 min-w-0 flex-1">
+                <div class="p-2 bg-blue-600 rounded-lg text-white shrink-0"><i data-lucide="store" class="w-5 h-5"></i></div>
+                <div class="min-w-0">
+                    <h2 class="font-bold text-base md:text-lg text-slate-900 truncate" id="display-store-name">Loja</h2>
+                    <span id="store-display-user" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 truncate max-w-[180px]">Comprador</span>
                 </div>
                 <!-- Seletor visível apenas quando usuário tem múltiplas lojas -->
-                <div id="store-switcher-wrap" class="hidden ml-3 border-l border-slate-200 pl-3">
+                <div id="store-switcher-wrap" class="hidden ml-2 md:ml-3 border-l border-slate-200 pl-2 md:pl-3 shrink-0">
                     <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Loja Ativa</label>
-                    <select id="store-switcher" onchange="switchActiveStore(this.value)" class="text-xs font-mono px-2 py-1 border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"></select>
+                    <select id="store-switcher" data-testid="store-switcher" onchange="switchActiveStore(this.value)" class="text-xs font-mono px-2 py-1 border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none max-w-[140px]"></select>
                 </div>
             </div>
-            <div class="flex items-center space-x-4">
-                <button onclick="reviewOrder()" class="relative flex items-center space-x-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition shadow">
+            <div class="flex items-center space-x-2 md:space-x-4 shrink-0">
+                <button onclick="reviewOrder()" data-testid="review-order-btn" class="relative flex items-center space-x-1 px-3 md:px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs md:text-sm font-medium transition shadow">
                     <i data-lucide="shopping-bag" class="w-4 h-4"></i>
-                    <span>Visualizar Pedido</span>
+                    <span class="hidden sm:inline">Visualizar Pedido</span>
+                    <span class="sm:hidden">Pedido</span>
                     <span id="badge-total-items" class="absolute -top-2 -right-2 bg-red-500 text-white text-[10px] font-bold rounded-full h-5 w-5 flex items-center justify-center border-2 border-white hidden">0</span>
                 </button>
-                <button onclick="logout()" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
+                <button onclick="logout()" data-testid="store-logout-btn" class="text-slate-500 hover:text-slate-700 p-1.5 rounded-lg border border-slate-200 hover:bg-slate-100 transition">
                     <i data-lucide="log-out" class="w-5 h-5"></i>
                 </button>
             </div>
         </header>
 
         <div class="bg-slate-200 p-2 flex border-b border-slate-300">
-            <div class="max-w-6xl w-full mx-auto grid grid-cols-2 gap-4 px-4">
-                <button onclick="switchStoreCard('order')" id="btn-card-order" class="bg-white shadow p-4 rounded-xl text-left border-2 border-blue-600 transition flex items-center gap-3 w-full">
-                    <div class="p-3 bg-blue-100 text-blue-700 rounded-lg"><i data-lucide="shopping-basket" class="w-6 h-6"></i></div>
-                    <div>
-                        <h3 class="font-bold text-slate-900 text-sm">📦 Fazer Pedido</h3>
-                        <p class="text-[11px] text-slate-500">Lançar quantidades de compra nos fornecedores</p>
+            <div class="max-w-6xl w-full mx-auto grid grid-cols-2 gap-2 md:gap-4 px-2 md:px-4">
+                <button onclick="switchStoreCard('order')" id="btn-card-order" data-testid="btn-card-order" class="bg-white shadow p-3 md:p-4 rounded-xl text-left border-2 border-blue-600 transition flex items-center gap-2 md:gap-3 w-full">
+                    <div class="p-2 md:p-3 bg-blue-100 text-blue-700 rounded-lg shrink-0"><i data-lucide="shopping-basket" class="w-5 h-5 md:w-6 md:h-6"></i></div>
+                    <div class="min-w-0">
+                        <h3 class="font-bold text-slate-900 text-xs md:text-sm">📦 Fazer Pedido</h3>
+                        <p class="text-[10px] md:text-[11px] text-slate-500 leading-tight">Lançar quantidades nos fornecedores</p>
                     </div>
                 </button>
-                <button onclick="switchStoreCard('prices')" id="btn-card-prices" class="bg-white shadow p-4 rounded-xl text-left border-2 border-transparent hover:border-slate-300 transition flex items-center gap-3 w-full">
-                    <div class="p-3 bg-amber-100 text-amber-700 rounded-lg"><i data-lucide="tags" class="w-6 h-6"></i></div>
-                    <div>
-                        <h3 class="font-bold text-slate-900 text-sm">💰 Preços de Venda</h3>
-                        <p class="text-[11px] text-slate-500">Histórico de preços vigentes atualizados pelo ADM</p>
+                <button onclick="switchStoreCard('prices')" id="btn-card-prices" data-testid="btn-card-prices" class="bg-white shadow p-3 md:p-4 rounded-xl text-left border-2 border-transparent hover:border-slate-300 transition flex items-center gap-2 md:gap-3 w-full">
+                    <div class="p-2 md:p-3 bg-amber-100 text-amber-700 rounded-lg shrink-0"><i data-lucide="tags" class="w-5 h-5 md:w-6 md:h-6"></i></div>
+                    <div class="min-w-0">
+                        <h3 class="font-bold text-slate-900 text-xs md:text-sm">💰 Preços de Venda</h3>
+                        <p class="text-[10px] md:text-[11px] text-slate-500 leading-tight">Histórico de preços vigentes</p>
                     </div>
                 </button>
             </div>
         </div>
 
-        <main class="flex-1 p-6 max-w-6xl w-full mx-auto">
+        <main class="flex-1 p-3 md:p-6 max-w-6xl w-full mx-auto">
             <div id="store-area-order" class="block space-y-4"></div>
             <div id="store-area-prices" class="hidden space-y-4">
                 <div class="bg-amber-50 border border-amber-200 p-3 rounded-lg text-xs text-amber-950 flex items-center gap-2">
                     <i data-lucide="info" class="w-4 h-4 shrink-0 text-amber-600"></i>
                     <span>Tabela de conferência oficial atualizada em tempo real via Firebase.</span>
                 </div>
-                <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                    <table class="w-full text-left text-sm border-collapse">
+                <div class="bg-white border border-slate-200 rounded-xl shadow-sm scroll-x">
+                    <table class="w-full text-left text-sm border-collapse table-sticky-first">
                         <thead>
                             <tr class="bg-slate-100 border-b border-slate-300 text-slate-600 text-xs font-bold uppercase font-mono">
                                 <th class="p-3">Fornecedor</th>
@@ -338,7 +429,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
-            getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, addDoc, deleteDoc, query, where, getDocs
+            getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, addDoc, deleteDoc, query, where, getDocs, deleteField
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { 
             getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged 
@@ -1060,15 +1151,27 @@
 
         window.updateStoreQuantityFromAdmin = async function(storeName, productId, val) {
             const qty = parseInt(val);
-            const currentStoreQuantities = window.state.orders[storeName] || {};
-            
+            const ref = doc(db, "orders", storeName);
+            // ATÔMICO POR CAMPO: evita race quando várias abas/usuários editam o mesmo doc de pedidos.
+            // Cada write mexe apenas na chave `quantities.{productId}` sem sobrescrever as outras.
+            const patch = {};
             if (isNaN(qty) || qty <= 0) {
-                delete currentStoreQuantities[productId];
+                patch[`quantities.${productId}`] = deleteField();
             } else {
-                currentStoreQuantities[productId] = qty;
+                patch[`quantities.${productId}`] = qty;
             }
-
-            await setDoc(doc(db, "orders", storeName), { quantities: currentStoreQuantities });
+            try {
+                await updateDoc(ref, patch);
+            } catch (err) {
+                // Documento ainda não existe -> cria com o campo inicial
+                if (err && (err.code === "not-found" || /No document to update/i.test(err.message || ""))) {
+                    const init = {};
+                    if (!isNaN(qty) && qty > 0) init[productId] = qty;
+                    await setDoc(ref, { quantities: init }, { merge: true });
+                } else {
+                    throw err;
+                }
+            }
             await updateDoc(doc(db, "products", productId), {
                 lastUpdate: getTimestamp(),
                 updatedBy: `${window.state.currentUser.name} (ADM)`
@@ -1129,17 +1232,35 @@
             }
         };
 
-        window.updateStoreQuantity = async function(productId, val) {
+        // Debounce para evitar spam de writes enquanto o comprador digita
+        window.__qtyTimers = window.__qtyTimers || {};
+        window.updateStoreQuantity = function(productId, val) {
             const currentStore = window.state.currentUser.storeName;
-            const qty = parseInt(val);
-            const currentStoreQuantities = window.state.orders[currentStore] || {};
-
-            if(isNaN(qty) || qty <= 0) {
-                delete currentStoreQuantities[productId];
-            } else {
-                currentStoreQuantities[productId] = qty;
-            }
-            await setDoc(doc(db, "orders", currentStore), { quantities: currentStoreQuantities });
+            const key = currentStore + "|" + productId;
+            clearTimeout(window.__qtyTimers[key]);
+            window.__qtyTimers[key] = setTimeout(async () => {
+                const qty = parseInt(val);
+                const ref = doc(db, "orders", currentStore);
+                // ATÔMICO POR CAMPO -> evita race entre compradores simultâneos da mesma filial.
+                const patch = {};
+                if (isNaN(qty) || qty <= 0) {
+                    patch[`quantities.${productId}`] = deleteField();
+                } else {
+                    patch[`quantities.${productId}`] = qty;
+                }
+                try {
+                    await updateDoc(ref, patch);
+                } catch (err) {
+                    if (err && (err.code === "not-found" || /No document to update/i.test(err.message || ""))) {
+                        const init = {};
+                        if (!isNaN(qty) && qty > 0) init[productId] = qty;
+                        await setDoc(ref, { quantities: init }, { merge: true });
+                    } else {
+                        console.error("Erro ao salvar quantidade:", err);
+                        if (typeof showToast === "function") showToast("Falha ao salvar quantidade. Tente novamente.");
+                    }
+                }
+            }, 300);
         };
 
         window.toggleAdminSup = function(sup) { window.state.expandedAdmin[sup] = !window.state.expandedAdmin[sup]; renderAdminDashboard(); }
@@ -1317,8 +1438,8 @@
                     const storeHeaders = window.state.stores.map(st => `<th class="p-1 border-r border-slate-200 text-center text-[10px] font-sans text-blue-900 bg-blue-50">${st}</th>`).join('');
 
                     bodyHtml = `
-                        <div class="border-t border-slate-200 overflow-x-auto">
-                            <table class="w-full text-left text-xs border-collapse font-mono">
+                        <div class="border-t border-slate-200 scroll-x">
+                            <table class="w-full text-left text-xs border-collapse font-mono table-sticky-first">
                                 <thead>
                                     <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 select-none">
                                         <th class="p-1 border-r border-slate-200 text-center w-8">Ref</th>
@@ -1420,8 +1541,8 @@
                     });
 
                     accordionTable = `
-                        <div class="border-t border-slate-200 overflow-x-auto">
-                            <table class="w-full text-left text-sm border-collapse">
+                        <div class="border-t border-slate-200 scroll-x">
+                            <table class="w-full text-left text-sm border-collapse table-sticky-first">
                                 <thead>
                                     <tr class="bg-slate-50 border-b border-slate-200 text-slate-500 text-xs uppercase font-semibold">
                                         <th class="p-3">Nome do Produto</th>
@@ -1547,6 +1668,81 @@
             alert("Pedido salvo com sucesso no banco de dados da central!");
             closeModal();
         };
+
+        // ============================================================
+        //  PWA: Service Worker + Install prompt + Toast helper
+        // ============================================================
+        window.showToast = function(msg, ms=2600) {
+            const el = document.getElementById("app-toast");
+            if (!el) return;
+            el.textContent = msg;
+            el.style.display = "block";
+            clearTimeout(window.__toastT);
+            window.__toastT = setTimeout(() => { el.style.display = "none"; }, ms);
+        };
+
+        // Service worker (só em contextos HTTPS ou localhost; navegadores modernos)
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("/sw.js", { scope: "/" })
+                    .then(reg => {
+                        // Detecta atualização e recarrega automaticamente após instalar nova versão
+                        reg.addEventListener("updatefound", () => {
+                            const nw = reg.installing;
+                            if (!nw) return;
+                            nw.addEventListener("statechange", () => {
+                                if (nw.state === "installed" && navigator.serviceWorker.controller) {
+                                    // Nova versão disponível
+                                    showToast("Nova versão disponível. Atualizando...");
+                                    nw.postMessage("SKIP_WAITING");
+                                }
+                            });
+                        });
+                    })
+                    .catch(err => console.warn("SW register failed", err));
+
+                let refreshing = false;
+                navigator.serviceWorker.addEventListener("controllerchange", () => {
+                    if (refreshing) return;
+                    refreshing = true;
+                    window.location.reload();
+                });
+            });
+        }
+
+        // beforeinstallprompt: mostra botão flutuante para instalação
+        let deferredInstallPrompt = null;
+        window.addEventListener("beforeinstallprompt", (e) => {
+            e.preventDefault();
+            deferredInstallPrompt = e;
+            const btn = document.getElementById("pwa-install-btn");
+            if (btn) btn.style.display = "inline-flex";
+        });
+        window.__pwaInstall = async function() {
+            if (!deferredInstallPrompt) {
+                // iOS Safari não dispara beforeinstallprompt -> mostra instrução manual
+                const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) && !window.MSStream;
+                if (isIOS) {
+                    alert("Para instalar no iPhone/iPad:\n1) Toque no botão Compartilhar\n2) Escolha 'Adicionar à Tela de Início'.");
+                }
+                return;
+            }
+            deferredInstallPrompt.prompt();
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === "accepted") showToast("App instalado com sucesso!");
+            deferredInstallPrompt = null;
+            const btn = document.getElementById("pwa-install-btn");
+            if (btn) btn.style.display = "none";
+        };
+        window.addEventListener("appinstalled", () => {
+            const btn = document.getElementById("pwa-install-btn");
+            if (btn) btn.style.display = "none";
+            showToast("CEASA instalado!");
+        });
+
+        // Aviso de conexão (offline / online) para o comprador saber
+        window.addEventListener("offline", () => showToast("⚠️ Sem conexão. Aguarde para enviar pedidos."));
+        window.addEventListener("online", () => showToast("✅ Conexão restabelecida."));
     </script>
 </body>
 </html>
