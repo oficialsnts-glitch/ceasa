@@ -203,6 +203,8 @@
                     <span class="font-bold text-xs uppercase font-mono tracking-wider">Cadastro de Fornecedores</span>
                 </div>
 
+                <div id="orphan-warning" class="px-4 pt-4"></div>
+
                 <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 bg-slate-50/50">
                     <!-- Form Fornecedor -->
                     <form id="form-supplier" onsubmit="saveSupplier(event)" class="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
@@ -940,6 +942,17 @@
         function renderAdminSuppliersTable() {
             const tbody = document.getElementById("table-adm-suppliers");
             if (!tbody) return;
+
+            // Detecta produtos órfãos (fornecedor removido do cadastro)
+            const validNames = new Set(window.state.supplierDocs.map(s => s.name));
+            const orphanBySupplier = {};
+            window.state.products.forEach(p => {
+                if (!validNames.has(p.supplier)) {
+                    orphanBySupplier[p.supplier] = (orphanBySupplier[p.supplier] || 0) + 1;
+                }
+            });
+            renderOrphanWarning(orphanBySupplier);
+
             if (!window.state.supplierDocs.length) {
                 tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-400">Nenhum fornecedor cadastrado ainda.</td></tr>`;
                 return;
@@ -963,6 +976,41 @@
             }).join('');
             lucide.createIcons();
         }
+
+        function renderOrphanWarning(orphanBySupplier) {
+            const host = document.getElementById("orphan-warning");
+            if (!host) return;
+            const names = Object.keys(orphanBySupplier);
+            if (!names.length) { host.innerHTML = ""; return; }
+            const total = names.reduce((acc, n) => acc + orphanBySupplier[n], 0);
+            const items = names.map(n => `<li><strong>${n}</strong> — ${orphanBySupplier[n]} produto(s)</li>`).join("");
+            host.innerHTML = `
+                <div class="bg-amber-50 border border-amber-300 rounded-lg p-3 flex items-start gap-3 text-xs">
+                    <i data-lucide="alert-triangle" class="w-5 h-5 text-amber-600 shrink-0 mt-0.5"></i>
+                    <div class="flex-1">
+                        <p class="font-bold text-amber-900 mb-1">Produtos órfãos detectados (${total})</p>
+                        <p class="text-amber-800 mb-2">Existem produtos vinculados a fornecedores que não estão mais cadastrados:</p>
+                        <ul class="list-disc list-inside text-amber-900 mb-2">${items}</ul>
+                        <button onclick="cleanupOrphans()" data-testid="cleanup-orphans-btn" class="inline-flex items-center gap-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold px-3 py-1.5 rounded shadow transition">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> Limpar produtos órfãos
+                        </button>
+                    </div>
+                </div>
+            `;
+            lucide.createIcons();
+        }
+
+        window.cleanupOrphans = async function() {
+            const validNames = new Set(window.state.supplierDocs.map(s => s.name));
+            const orphans = window.state.products.filter(p => !validNames.has(p.supplier));
+            if (!orphans.length) return;
+            if (!confirm(`Excluir permanentemente ${orphans.length} produto(s) órfão(s)?`)) return;
+            try {
+                await Promise.all(orphans.map(p => deleteDoc(doc(db, "products", p.id))));
+            } catch (err) {
+                alert("Erro ao limpar órfãos: " + err.message);
+            }
+        };
 
         function getTimestamp() {
             const now = new Date();
@@ -1312,8 +1360,11 @@
             const container = document.getElementById("store-area-order");
             container.innerHTML = "";
 
+            const validSuppliers = new Set(window.state.suppliers);
             const grouped = {};
             window.state.products.forEach(p => {
+                // Ignora produtos cujo fornecedor não existe mais no Firestore (órfãos)
+                if (!validSuppliers.has(p.supplier)) return;
                 const price = getPriceForStore(p, currentStore);
                 if(price === null) return; 
                 if(!grouped[p.supplier]) grouped[p.supplier] = [];
@@ -1406,7 +1457,8 @@
             const tbody = document.getElementById("table-store-prices-logs");
             tbody.innerHTML = "";
 
-            const validProducts = window.state.products.filter(p => getPriceForStore(p, currentStore) !== null);
+            const validSuppliers = new Set(window.state.suppliers);
+            const validProducts = window.state.products.filter(p => validSuppliers.has(p.supplier) && getPriceForStore(p, currentStore) !== null);
 
             if(validProducts.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Nenhum preço associado a esta filial.</td></tr>`;
