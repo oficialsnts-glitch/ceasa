@@ -426,7 +426,7 @@
         </header>
 
         <div class="bg-slate-200 p-2 flex border-b border-slate-300">
-            <div class="max-w-6xl w-full mx-auto grid grid-cols-2 gap-2 md:gap-4 px-2 md:px-4">
+            <div class="max-w-6xl w-full mx-auto grid grid-cols-3 gap-2 md:gap-3 px-2 md:px-4">
                 <button onclick="switchStoreCard('order')" id="btn-card-order" data-testid="btn-card-order" class="bg-white shadow p-3 md:p-4 rounded-xl text-left border-2 border-blue-600 transition flex items-center gap-2 md:gap-3 w-full">
                     <div class="p-2 md:p-3 bg-blue-100 text-blue-700 rounded-lg shrink-0"><i data-lucide="shopping-basket" class="w-5 h-5 md:w-6 md:h-6"></i></div>
                     <div class="min-w-0">
@@ -440,6 +440,14 @@
                         <h3 class="font-bold text-slate-900 text-xs md:text-sm">💰 Preços de Venda</h3>
                         <p class="text-[10px] md:text-[11px] text-slate-500 leading-tight">Histórico de preços vigentes</p>
                     </div>
+                </button>
+                <button onclick="switchStoreCard('changes')" id="btn-card-changes" data-testid="btn-card-changes" class="bg-white shadow p-3 md:p-4 rounded-xl text-left border-2 border-transparent hover:border-slate-300 transition flex items-center gap-2 md:gap-3 w-full relative">
+                    <div class="p-2 md:p-3 bg-rose-100 text-rose-700 rounded-lg shrink-0"><i data-lucide="bell-ring" class="w-5 h-5 md:w-6 md:h-6"></i></div>
+                    <div class="min-w-0">
+                        <h3 class="font-bold text-slate-900 text-xs md:text-sm">🔔 Alterações Hoje</h3>
+                        <p class="text-[10px] md:text-[11px] text-slate-500 leading-tight">Só produtos com preço alterado</p>
+                    </div>
+                    <span id="badge-card-changes" data-testid="badge-card-changes" class="hidden absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black rounded-full min-w-[22px] h-[22px] px-1 flex items-center justify-center border-2 border-white shadow">0</span>
                 </button>
             </div>
         </div>
@@ -490,6 +498,15 @@
                         <tbody id="table-store-prices-logs" class="divide-y divide-slate-200 text-slate-700 font-mono text-xs"></tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- ============ ÁREA: ALTERAÇÕES DE PREÇO DE VENDA HOJE ============ -->
+            <div id="store-area-changes" class="hidden space-y-4">
+                <div class="bg-rose-50 border border-rose-200 p-3 rounded-lg text-xs text-rose-950 flex items-start gap-2">
+                    <i data-lucide="bell-ring" class="w-4 h-4 shrink-0 text-rose-600 mt-0.5"></i>
+                    <span>Apenas produtos com o <strong>preço de venda alterado hoje</strong> na sua filial. Confira o histórico das mudanças antes de ajustar as etiquetas/vendas da loja.</span>
+                </div>
+                <div id="store-changes-list" data-testid="store-changes-list" class="space-y-3"></div>
             </div>
         </main>
     </div>
@@ -746,10 +763,19 @@
             if (window.state.currentUser?.role === "admin") {
                 renderAdminDashboard();
             } else if (window.state.currentUser?.role === "store") {
+                // Sempre atualiza o card ativo, e o contador do card "Alterações Hoje"
                 if (window.state.activeTab === 'order') {
                     renderStoreCatalog();
+                } else if (window.state.activeTab === 'changes') {
+                    renderChangesCard();
+                    // Mantém o cálculo de alterados hoje para o banner/badge
+                    computeTodayChanges();
                 } else {
                     renderPricesLogsCard();
+                }
+                // Contador do botão "Alterações Hoje" sempre atualizado
+                if (window.state.activeTab !== 'order' && window.state.activeTab !== 'changes') {
+                    computeTodayChanges();
                 }
             }
         }
@@ -1520,18 +1546,28 @@
             window.state.activeTab = cardType;
             const btnOrder = document.getElementById("btn-card-order");
             const btnPrices = document.getElementById("btn-card-prices");
+            const btnChanges = document.getElementById("btn-card-changes");
             const areaOrder = document.getElementById("store-area-order");
             const areaPrices = document.getElementById("store-area-prices");
+            const areaChanges = document.getElementById("store-area-changes");
 
-            btnOrder.className = "bg-white shadow p-4 rounded-xl text-left border-2 border-transparent transition flex items-center gap-3 w-full";
-            btnPrices.className = "bg-white shadow p-4 rounded-xl text-left border-2 border-transparent transition flex items-center gap-3 w-full";
+            const baseCls = "bg-white shadow p-3 md:p-4 rounded-xl text-left border-2 border-transparent transition flex items-center gap-2 md:gap-3 w-full";
+            btnOrder.className = baseCls;
+            btnPrices.className = baseCls;
+            btnChanges.className = baseCls + " relative";
+
             areaOrder.classList.add("hidden");
             areaPrices.classList.add("hidden");
+            areaChanges.classList.add("hidden");
 
-            if(cardType === 'order') {
+            if (cardType === 'order') {
                 btnOrder.classList.add("border-blue-600");
                 areaOrder.classList.remove("hidden");
                 renderStoreCatalog();
+            } else if (cardType === 'changes') {
+                btnChanges.classList.add("border-rose-500");
+                areaChanges.classList.remove("hidden");
+                renderChangesCard();
             } else {
                 btnPrices.classList.add("border-amber-500");
                 areaPrices.classList.remove("hidden");
@@ -1775,7 +1811,7 @@
 
             if(Object.keys(grouped).length === 0) {
                 container.innerHTML = `<div class="bg-white p-8 border border-slate-200 rounded-xl text-center text-slate-500 shadow-sm">Nenhum produto liberado para sua filial.</div>`;
-                updatePriceChangeBanner(0, []);
+                computeTodayChanges();
                 return;
             }
 
@@ -1803,9 +1839,9 @@
                             : "hover:bg-slate-50 transition border-b border-slate-200";
 
                         // Badge inline com anterior → atual (usa o primeiro preço do dia como "anterior")
-                        // e o preço atual como destino final da variação.
+                        // e o preço atual como destino final da variação. Histórico completo do dia
+                        // fica no card dedicado "Alterações Hoje".
                         let priceChangeBadge = "";
-                        let historyCardHtml = "";
                         if (hasHistoryToday) {
                             const firstPrev = Number(history[0].prev) || 0;
                             const lastNext = Number(history[history.length - 1].next) || finalPrice;
@@ -1821,39 +1857,6 @@
                                     <i data-lucide="${arrowIcon}" class="w-3 h-3"></i>
                                     R$ ${formatBRLString(firstPrev)} → R$ ${formatBRLString(lastNext)}
                                 </span>
-                            `;
-
-                            // Card expansível com todo o histórico do dia
-                            const items = history.map(h => {
-                                const diff = (Number(h.next) || 0) - (Number(h.prev) || 0);
-                                const diffCls = diff > 0 ? "text-rose-600" : (diff < 0 ? "text-emerald-600" : "text-slate-500");
-                                const diffSign = diff > 0 ? "+" : "";
-                                return `
-                                    <div class="flex items-center justify-between gap-2 py-1.5 border-b border-amber-100 last:border-0 text-[11px]">
-                                        <div class="flex items-center gap-2">
-                                            <span class="font-mono font-bold text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">${h.time}</span>
-                                            <span class="text-slate-500 line-through">R$ ${formatBRLString(h.prev)}</span>
-                                            <i data-lucide="arrow-right" class="w-3 h-3 text-amber-600"></i>
-                                            <span class="text-slate-900 font-bold">R$ ${formatBRLString(h.next)}</span>
-                                            <span class="${diffCls} font-bold text-[10px]">(${diffSign}R$ ${formatBRLString(Math.abs(diff))})</span>
-                                        </div>
-                                        <span class="text-slate-500 text-[10px]">por ${h.user || '—'}</span>
-                                    </div>
-                                `;
-                            }).join('');
-
-                            historyCardHtml = `
-                                <tr class="bg-amber-50/40 border-b border-slate-200" id="history-row-${p.id}">
-                                    <td colspan="4" class="p-3">
-                                        <div class="border border-amber-200 bg-white rounded-lg overflow-hidden">
-                                            <div class="px-3 py-1.5 bg-amber-100 text-amber-900 text-[10px] font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
-                                                <i data-lucide="history" class="w-3 h-3"></i>
-                                                Histórico do dia — ${history.length} alteração(ões)
-                                            </div>
-                                            <div class="px-3 py-1">${items}</div>
-                                        </div>
-                                    </td>
-                                </tr>
                             `;
                         }
 
@@ -1882,7 +1885,6 @@
                                         class="w-24 px-2 py-1 text-center font-bold border border-blue-300 rounded-lg focus:ring-2 focus:ring-blue-400 text-sm bg-white text-blue-950">
                                 </td>
                             </tr>
-                            ${historyCardHtml}
                         `;
                     });
 
@@ -1917,7 +1919,8 @@
                 `;
             }
             updateCartBadge();
-            updatePriceChangeBanner(totalChangedToday, changedProductIds);
+            // Sincroniza banner + badge do botão "Alterações Hoje"
+            computeTodayChanges();
         }
 
         // Atualiza o banner de alerta de alterações de preço no dia.
@@ -1958,27 +1961,136 @@
         };
 
         window.scrollToFirstPriceChange = function() {
-            const ids = window.state.priceChangedIdsToday || [];
-            if (!ids.length) return;
-            // Garante a aba "Fazer Pedido" ativa antes de rolar
-            if (window.state.activeTab !== 'order') {
-                switchStoreCard('order');
-            }
-            // Garante que o fornecedor do primeiro item esteja expandido
-            const first = window.state.products.find(p => p.id === ids[0]);
-            if (first && window.state.expandedStore[first.supplier] === false) {
-                window.state.expandedStore[first.supplier] = true;
-                renderStoreCatalog();
-            }
-            setTimeout(() => {
-                const el = document.querySelector(`[data-product-row="${ids[0]}"]`);
-                if (el) {
-                    el.scrollIntoView({ behavior: "smooth", block: "center" });
-                    el.classList.add("ring-2", "ring-amber-500");
-                    setTimeout(() => el.classList.remove("ring-2", "ring-amber-500"), 1800);
-                }
-            }, 80);
+            // Agora leva direto para o card exclusivo de "Alterações Hoje"
+            switchStoreCard('changes');
         };
+
+        // Calcula os produtos que tiveram o preço de venda alterado hoje
+        // para a loja atual, atualiza contador do botão e do banner.
+        function computeTodayChanges() {
+            const u = window.state.currentUser;
+            if (!u || u.role !== "store") return { count: 0, items: [] };
+            const currentStore = u.storeName;
+            const validSuppliers = new Set(window.state.suppliers);
+            const items = [];
+            window.state.products.forEach(p => {
+                if (!validSuppliers.has(p.supplier)) return;
+                if (getPriceForStore(p, currentStore) === null) return;
+                const history = window.getTodayPriceHistoryForStore(p, currentStore);
+                if (history.length) items.push({ product: p, history });
+            });
+            // Ordena por horário da última alteração (mais recente primeiro)
+            items.sort((a, b) => {
+                const la = a.history[a.history.length - 1].time || "";
+                const lb = b.history[b.history.length - 1].time || "";
+                return lb.localeCompare(la);
+            });
+
+            // Atualiza badge do botão "Alterações Hoje"
+            const badgeBtn = document.getElementById("badge-card-changes");
+            if (badgeBtn) {
+                if (items.length > 0) {
+                    badgeBtn.innerText = items.length;
+                    badgeBtn.classList.remove("hidden");
+                } else {
+                    badgeBtn.classList.add("hidden");
+                }
+            }
+
+            // Guarda IDs para uso rápido (banner "Ver alterações" etc.)
+            window.state.priceChangedIdsToday = items.map(i => i.product.id);
+
+            // Atualiza banner
+            updatePriceChangeBanner(items.length, window.state.priceChangedIdsToday);
+            return { count: items.length, items };
+        }
+
+        function renderChangesCard() {
+            const container = document.getElementById("store-changes-list");
+            if (!container) return;
+            const { count, items } = computeTodayChanges();
+
+            if (count === 0) {
+                container.innerHTML = `
+                    <div class="bg-white border-2 border-dashed border-slate-300 rounded-xl p-8 text-center">
+                        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-emerald-50 text-emerald-600 mb-3">
+                            <i data-lucide="check-circle-2" class="w-6 h-6"></i>
+                        </div>
+                        <h3 class="font-bold text-slate-800 text-sm mb-1">Nenhum preço alterado hoje na sua filial</h3>
+                        <p class="text-xs text-slate-500">Você está com os preços do dia em dia. Volte aqui sempre que ver o alerta 🔔 no login.</p>
+                    </div>
+                `;
+                lucide.createIcons();
+                return;
+            }
+
+            container.innerHTML = items.map(({ product: p, history }) => {
+                const currentStore = window.state.currentUser.storeName;
+                const finalPrice = getPriceForStore(p, currentStore);
+                const firstPrev = Number(history[0].prev) || 0;
+                const lastNext = Number(history[history.length - 1].next) || finalPrice;
+                const wentUp = lastNext > firstPrev;
+                const diffTotal = lastNext - firstPrev;
+                const diffPct = firstPrev > 0 ? (diffTotal / firstPrev) * 100 : 0;
+                const arrowIcon = wentUp ? "trending-up" : "trending-down";
+                const headCls = wentUp
+                    ? "bg-rose-50 border-rose-200 text-rose-800"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-800";
+                const chipCls = wentUp
+                    ? "bg-rose-100 text-rose-800 border-rose-300"
+                    : "bg-emerald-100 text-emerald-800 border-emerald-300";
+
+                const rowsHtml = history.map(h => {
+                    const diff = (Number(h.next) || 0) - (Number(h.prev) || 0);
+                    const diffCls = diff > 0 ? "text-rose-600" : (diff < 0 ? "text-emerald-600" : "text-slate-500");
+                    const diffSign = diff > 0 ? "+" : (diff < 0 ? "−" : "");
+                    return `
+                        <div class="flex items-center justify-between gap-2 py-2 border-b border-slate-100 last:border-0">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-mono font-bold text-[10px] text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded">${h.time}</span>
+                                <span class="text-slate-500 line-through font-mono text-xs">R$ ${formatBRLString(h.prev)}</span>
+                                <i data-lucide="arrow-right" class="w-3 h-3 text-slate-400"></i>
+                                <span class="text-slate-900 font-bold font-mono text-sm">R$ ${formatBRLString(h.next)}</span>
+                                <span class="${diffCls} font-bold text-[10px] font-mono">${diffSign}R$ ${formatBRLString(Math.abs(diff))}</span>
+                            </div>
+                            <span class="text-slate-400 text-[10px] font-medium whitespace-nowrap">por ${h.user || '—'}</span>
+                        </div>
+                    `;
+                }).join('');
+
+                return `
+                    <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden" data-testid="changes-card-${p.id}">
+                        <div class="px-4 py-3 border-b border-slate-200 ${headCls} flex items-start md:items-center justify-between gap-3 flex-wrap">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-black text-sm md:text-base text-slate-900 uppercase tracking-tight">${p.name}</span>
+                                    <span class="text-[10px] font-mono font-bold uppercase text-slate-600 bg-white/70 border border-slate-200 px-1.5 py-0.5 rounded">${p.supplier}</span>
+                                </div>
+                                <p class="text-[11px] mt-0.5 opacity-80">${history.length} alteração(ões) hoje</p>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border ${chipCls} font-mono font-bold text-xs whitespace-nowrap">
+                                    <i data-lucide="${arrowIcon}" class="w-3.5 h-3.5"></i>
+                                    R$ ${formatBRLString(firstPrev)} → R$ ${formatBRLString(lastNext)}
+                                </span>
+                                <span class="hidden md:inline-flex text-[11px] font-black font-mono px-2 py-1 rounded ${chipCls}">
+                                    ${wentUp ? "+" : "−"}${Math.abs(diffPct).toFixed(1)}%
+                                </span>
+                            </div>
+                        </div>
+                        <div class="px-4 py-2">${rowsHtml}</div>
+                        <div class="px-4 py-2 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 text-[11px]">
+                            <span class="text-slate-500">Preço atual da sua filial:</span>
+                            <span class="font-black font-mono text-emerald-800 text-sm">R$ ${formatBRLString(finalPrice)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            lucide.createIcons();
+        }
+        window.renderChangesCard = renderChangesCard;
+
 
         function renderPricesLogsCard() {
             const currentStore = window.state.currentUser.storeName;
