@@ -84,7 +84,7 @@
             </div>
         </div>
 
-        <!-- NOVO: GERENCIAMENTO DE COMPRADORES E ADMS -->
+        <!-- GERENCIAMENTO DE COMPRADORES E ADMS -->
         <div class="p-4 max-w-full">
             <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-6">
                 <div class="bg-slate-700 text-white px-4 py-2.5 flex items-center space-x-2">
@@ -220,7 +220,7 @@
         </main>
     </div>
 
-    <!-- ================= MODAL DO PEDIDO SUDESTE ================= -->
+    <!-- ================= MODAL DO PEDIDO ================= -->
     <div id="modal-order" class="hidden fixed inset-0 bg-slate-900/55 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden border border-slate-200">
             <div class="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
@@ -239,7 +239,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
         import { 
-            getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, addDoc, deleteDoc 
+            getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, addDoc, deleteDoc, query, where, getDocs
         } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
         import { 
             getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, onAuthStateChanged 
@@ -279,8 +279,31 @@
                     window.state.currentUser = { uid: user.uid, ...userDoc.data() };
                     initRealtimeListeners();
                 } else {
-                    alert("Seu perfil de usuário não foi localizado no Firestore.");
-                    logout();
+                    // SE O USUÁRIO EXISTE NO AUTH MAS NÃO TEM PERFIL NO FIRESTORE (Primeiro login de conta criada pelo ADM)
+                    const q = query(collection(db, "users"), where("email", "==", user.email.toLowerCase()));
+                    const querySnapshot = await getDocs(q);
+                    
+                    if (!querySnapshot.empty) {
+                        const tempDoc = querySnapshot.docs[0];
+                        const tempData = tempDoc.data();
+                        
+                        // Migra a conta provisória do ADM para o UID real do Firebase Auth
+                        await setDoc(doc(db, "users", user.uid), {
+                            name: tempData.name,
+                            email: tempData.email,
+                            role: tempData.role,
+                            storeName: tempData.storeName
+                        });
+                        
+                        // Deleta o provisório
+                        await deleteDoc(doc(db, "users", tempDoc.id));
+                        
+                        window.state.currentUser = { uid: user.uid, name: tempData.name, email: tempData.email, role: tempData.role, storeName: tempData.storeName };
+                        initRealtimeListeners();
+                    } else {
+                        alert("Seu perfil de usuário não foi localizado no Firestore.");
+                        logout();
+                    }
                 }
             } else {
                 window.state.currentUser = null;
@@ -295,7 +318,6 @@
             lucide.createIcons();
         }
 
-        // Carrega as coleções em tempo real do Firebase Firestore
         function initRealtimeListeners() {
             document.getElementById("screen-login").classList.add("hidden");
 
@@ -362,8 +384,24 @@
             const password = document.getElementById("login-password").value;
 
             try {
+                // Tenta logar normalmente
                 await signInWithEmailAndPassword(auth, email, password);
             } catch (err) {
+                if (err.code === "auth/user-not-found" || err.code === "auth/invalid-credential") {
+                    // Verifica se o ADM deixou um pré-cadastro no Firestore
+                    const q = query(collection(db, "users"), where("email", "==", email));
+                    const querySnapshot = await getDocs(q);
+                    
+                    if (!querySnapshot.empty && querySnapshot.docs[0].data().tempPass === password) {
+                        // Se a senha bater com o provisório do Firestore, cria a conta real no Auth
+                        try {
+                            await createUserWithEmailAndPassword(auth, email, password);
+                            return;
+                        } catch(createErr) {
+                            alert("Erro ao inicializar credencial: " + createErr.message);
+                        }
+                    }
+                }
                 alert("Erro ao autenticar: Verifique se as credenciais cadastradas pelo ADM estão corretas.");
             }
         };
@@ -372,7 +410,7 @@
             signOut(auth);
         };
 
-        // --- NOVO: GERENCIAMENTO DE ACESSOS PELO ADM ---
+        // --- GERENCIAMENTO DE ACESSOS PELO ADM ---
         window.toggleStoreSelectVisibility = function(role) {
             const wrapper = document.getElementById("adm-store-wrapper");
             if (role === 'admin') {
@@ -402,31 +440,16 @@
             if (password.length < 6) return alert("A senha precisa ter no mínimo 6 caracteres.");
 
             try {
-                // Para não deslogar o ADM ativo ao criar outra conta pelo AuthSDK clássico,
-                // vamos persistir o perfil diretamente no Firestore. O usuário criado
-                // fará o primeiro login e o Firebase lidará com o fluxo ou criará o registro se não existente.
-                // Abordagem corporativa ideal: Criamos uma chamada limpa.
-                
-                // NOTA TÉCNICA: O método secundário cria direto no firestore, e se o usuário não constar no Auth,
-                // criamos um disparador dinâmico ou usamos a própria trigger de login. Para simplificar em arquivo único
-                // sem cloud functions, criaremos via Auth alternativo ou mock seguro. 
-                // A melhor prática sem derrubar a sessão do Admin é criar o registro no banco e associar.
-                
-                // Vamos simular a gravação no banco de dados com ID gerado/E-mail hash para mapear o login
-                // e registrar o Auth no próximo login, ou usar um ID provisório seguro:
-                const fakeUid = "user_" + Date.now();
-                await setDoc(doc(db, "users", fakeUid), {
+                const provisoryId = "prov_" + Date.now();
+                await setDoc(doc(db, "users", provisoryId), {
                     name,
                     email,
                     role,
                     storeName,
-                    tempPass: password // Apenas para referência inicial se necessário
+                    tempPass: password
                 });
 
-                // Tenta registrar em segundo plano se o Firebase permitir criação paralela ou instrui o Auth.
-                // Para consistência de produção imediata em front único:
-                alert(`Credencial de ${name} salva no banco de dados com sucesso!\nNível: ${role === 'admin' ? 'Administrador' : 'Comprador da Loja ' + storeName}`);
-                
+                alert(`Credencial de ${name} salva com sucesso!\nO usuário será ativado no primeiro login utilizando este e-mail e senha.`);
                 document.getElementById("form-create-user").reset();
                 toggleStoreSelectVisibility("store");
             } catch (err) {
@@ -472,7 +495,6 @@
             lucide.createIcons();
         }
 
-        // --- ENGINES E ASSINATURAS DAS FUNÇÕES DO BANCO ---
         function getTimestamp() {
             const now = new Date();
             return `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
@@ -610,7 +632,6 @@
             await setDoc(doc(db, "orders", currentStore), { quantities: currentStoreQuantities });
         };
 
-        // --- INTERATIVIDADE E DESIGN EM TELA ---
         window.toggleAdminSup = function(sup) { window.state.expandedAdmin[sup] = !window.state.expandedAdmin[sup]; renderAdminDashboard(); }
         window.toggleStoreSup = function(sup) { window.state.expandedStore[sup] = !window.state.expandedStore[sup]; renderStoreCatalog(); }
 
@@ -640,7 +661,8 @@
 
         function isUpdatedToday(timestampStr) {
             if(!timestampStr) return false;
-            const todayStr = "19/07/2026";
+            const today = new Date();
+            const todayStr = `${String(today.getDate()).padStart(2,'0')}/${String(today.getMonth()+1).padStart(2,'0')}/${today.getFullYear()}`;
             return timestampStr.startsWith(todayStr);
         }
 
