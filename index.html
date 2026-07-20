@@ -480,8 +480,8 @@
                     <table class="w-full text-left text-sm border-collapse table-sticky-first">
                         <thead>
                             <tr class="bg-slate-100 border-b border-slate-300 text-slate-600 text-xs font-bold uppercase font-mono">
-                                <th class="p-3">Fornecedor</th>
                                 <th class="p-3">Produto</th>
+                                <th class="p-3">Fornecedor</th>
                                 <th class="p-3 text-center bg-emerald-50 text-emerald-900 border-x border-emerald-100">Preço Venda (Definido pelo ADM)</th>
                                 <th class="p-3 text-right">Última Modificação</th>
                                 <th class="p-3 text-right">Alterado por</th>
@@ -2003,13 +2003,13 @@
 
                 tbody.innerHTML += `
                     <tr class="${trClass}">
-                        <td class="p-3 font-semibold text-slate-600 uppercase tracking-tight text-xs">${p.supplier}</td>
                         <td class="p-3">
                             <div class="flex items-center gap-2">
                                 <span class="text-slate-900 font-bold">${p.name}</span>
                                 ${changedToday ? `<span class="bg-amber-200 text-amber-900 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wide animate-pulse-soft">Atualizado Hoje</span>` : ''}
                             </div>
                         </td>
+                        <td class="p-3 font-semibold text-slate-600 uppercase tracking-tight text-xs">${p.supplier}</td>
                         <td class="p-3 text-center font-mono font-black text-sm text-emerald-800 bg-emerald-50/60 border-x border-emerald-100">
                             R$ ${formatBRLString(finalSalePrice)}
                         </td>
