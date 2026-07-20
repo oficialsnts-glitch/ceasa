@@ -84,7 +84,7 @@
             <button id="admtab-cadastro" data-testid="admtab-cadastro-btn" onclick="switchAdminTab('cadastro')"
                 class="flex items-center gap-2 px-4 py-3 text-xs font-bold uppercase tracking-wider border-b-2 border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition">
                 <i data-lucide="user-plus" class="w-4 h-4"></i>
-                <span>Cadastro de Usuários</span>
+                <span>Cadastros</span>
             </button>
         </nav>
 
@@ -93,21 +93,23 @@
             <!-- Barra de Ações Rápidas -->
             <div class="bg-white border-b border-slate-200 p-4 flex flex-wrap gap-4 items-center justify-between shadow-sm">
                 <div class="flex flex-wrap gap-3 items-center">
-                    <select id="add-target-supplier" class="px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 bg-slate-50 font-mono"></select>
+                    <label class="text-[10px] font-bold uppercase text-slate-500 tracking-wider">Fornecedor</label>
+                    <select id="add-target-supplier" class="px-2 py-1.5 text-xs border border-slate-300 rounded focus:ring-1 focus:ring-emerald-500 bg-slate-50 font-mono min-w-[180px]"></select>
                     <button onclick="addNewRow()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-1.5 rounded flex items-center gap-1.5 shadow transition">
                         <i data-lucide="plus-square" class="w-4 h-4"></i> Inserir Produto
                     </button>
                 </div>
-                <div class="flex flex-wrap gap-2">
-                    <input type="text" id="quick-supplier" placeholder="Novo Fornecedor" class="px-2 py-1 text-xs border border-slate-300 rounded font-mono focus:ring-1 focus:ring-emerald-500 outline-none">
-                    <button onclick="quickAddSupplier()" class="bg-slate-800 hover:bg-slate-900 text-white text-xs px-3 py-1 rounded transition">Cadastrar Fornecedor</button>
+                <div class="text-[11px] text-slate-500 flex items-center gap-2">
+                    <i data-lucide="info" class="w-3.5 h-3.5"></i>
+                    <span>Para cadastrar/editar fornecedores, use a aba <strong>Cadastros</strong>.</span>
                 </div>
             </div>
         </section>
 
-        <!-- ============ ABA: CADASTRO DE USUÁRIOS (oculta por padrão) ============ -->
-        <section id="admview-cadastro" data-testid="admview-cadastro" class="hidden p-4 max-w-full">
-            <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-6">
+        <!-- ============ ABA: CADASTROS (Usuários + Fornecedores) ============ -->
+        <section id="admview-cadastro" data-testid="admview-cadastro" class="hidden p-4 max-w-full space-y-6">
+            <!-- ============ CARD: USUÁRIOS ============ -->
+            <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div class="bg-slate-700 text-white px-4 py-2.5 flex items-center space-x-2">
                     <i data-lucide="users" class="w-4 h-4 text-sky-400"></i>
                     <span class="font-bold text-xs uppercase font-mono tracking-wider">Gerenciamento de Acessos (Usuários / Compradores)</span>
@@ -116,7 +118,8 @@
                 <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 bg-slate-50/50">
                     <!-- Form Cadastro Usuário -->
                     <form id="form-create-user" onsubmit="adminCreateUser(event)" class="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
-                        <h4 class="text-xs font-bold uppercase text-slate-500 border-b pb-1 font-mono">Novo Cadastro</h4>
+                        <h4 class="text-xs font-bold uppercase text-slate-500 border-b pb-1 font-mono" id="form-user-title">Novo Cadastro</h4>
+                        <input type="hidden" id="adm-user-editing-id" value="">
                         <div>
                             <label class="block text-[10px] font-bold text-slate-600 uppercase">Nome Completo</label>
                             <input type="text" id="adm-user-name" required class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
@@ -126,27 +129,51 @@
                             <input type="email" id="adm-user-email" required class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
                         </div>
                         <div>
-                            <label class="block text-[10px] font-bold text-slate-600 uppercase">Senha de Acesso</label>
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase">
+                                Senha de Acesso <span id="adm-pass-hint" class="normal-case text-slate-400 font-normal">(obrigatória no cadastro)</span>
+                            </label>
                             <input type="password" id="adm-user-pass" required placeholder="Mínimo 6 caracteres" class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <label class="block text-[10px] font-bold text-slate-600 uppercase">Nível Acesso</label>
-                                <select id="adm-user-role" onchange="toggleStoreSelectVisibility(this.value)" class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 bg-white outline-none">
-                                    <option value="store">Comprador</option>
-                                    <option value="admin">Administrador</option>
-                                </select>
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase">Nível Acesso</label>
+                            <select id="adm-user-role" onchange="toggleStoreSelectVisibility(this.value)" class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 bg-white outline-none">
+                                <option value="store">Comprador</option>
+                                <option value="admin">Administrador</option>
+                            </select>
+                        </div>
+
+                        <div id="adm-store-wrapper" class="space-y-2 border border-slate-200 rounded p-2 bg-slate-50">
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase">Escopo de Acesso</label>
+                            <div class="flex gap-3 text-[11px]">
+                                <label class="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="adm-user-scope" value="single" checked onchange="renderStoreScopeUI(this.value)"> Loja Única
+                                </label>
+                                <label class="flex items-center gap-1.5 cursor-pointer">
+                                    <input type="radio" name="adm-user-scope" value="multi" onchange="renderStoreScopeUI(this.value)"> Múltiplas Lojas
+                                </label>
                             </div>
-                            <div id="adm-store-wrapper">
-                                <label class="block text-[10px] font-bold text-slate-600 uppercase">Loja Vinculada</label>
-                                <select id="adm-user-store" class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 bg-white outline-none">
-                                    <!-- Inserido dinamicamente via JS -->
-                                </select>
+
+                            <!-- Loja única -->
+                            <div id="adm-store-single-wrap">
+                                <label class="block text-[10px] font-bold text-slate-600 uppercase mt-1">Loja Vinculada</label>
+                                <select id="adm-user-store" class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 bg-white outline-none"></select>
+                            </div>
+
+                            <!-- Múltiplas lojas (checkboxes) -->
+                            <div id="adm-store-multi-wrap" class="hidden">
+                                <label class="block text-[10px] font-bold text-slate-600 uppercase mt-1">Lojas Permitidas</label>
+                                <div id="adm-user-stores-checks" class="grid grid-cols-2 gap-1 text-[11px] font-medium text-slate-700"></div>
                             </div>
                         </div>
-                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow transition mt-2">
-                            Salvar Credencial
-                        </button>
+
+                        <div class="flex gap-2 pt-2">
+                            <button type="submit" id="form-user-submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow transition">
+                                Salvar Credencial
+                            </button>
+                            <button type="button" id="form-user-cancel" onclick="cancelEditUser()" class="hidden px-3 py-1.5 border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-100 transition">
+                                Cancelar
+                            </button>
+                        </div>
                     </form>
 
                     <!-- Lista de Usuários Ativos -->
@@ -157,12 +184,56 @@
                                     <th class="p-2">Nome</th>
                                     <th class="p-2">E-mail</th>
                                     <th class="p-2 text-center">Nível</th>
-                                    <th class="p-2 text-center">Loja Acesso</th>
+                                    <th class="p-2">Loja(s) Acesso</th>
                                     <th class="p-2 text-center">Ações</th>
                                 </tr>
                             </thead>
                             <tbody id="table-adm-users" class="divide-y divide-slate-100 text-slate-700">
                                 <tr><td colspan="5" class="p-3 text-center text-slate-400 text-[11px]">Buscando usuários cadastrados...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ============ CARD: FORNECEDORES ============ -->
+            <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div class="bg-slate-700 text-white px-4 py-2.5 flex items-center space-x-2">
+                    <i data-lucide="truck" class="w-4 h-4 text-emerald-400"></i>
+                    <span class="font-bold text-xs uppercase font-mono tracking-wider">Cadastro de Fornecedores</span>
+                </div>
+
+                <div class="p-4 grid grid-cols-1 lg:grid-cols-3 gap-6 bg-slate-50/50">
+                    <!-- Form Fornecedor -->
+                    <form id="form-supplier" onsubmit="saveSupplier(event)" class="space-y-3 bg-white p-4 rounded-xl border border-slate-200">
+                        <h4 id="form-supplier-title" class="text-xs font-bold uppercase text-slate-500 border-b pb-1 font-mono">Novo Fornecedor</h4>
+                        <input type="hidden" id="adm-supplier-editing-id" value="">
+                        <div>
+                            <label class="block text-[10px] font-bold text-slate-600 uppercase">Nome do Fornecedor</label>
+                            <input type="text" id="adm-supplier-name" required class="w-full px-2 py-1 border border-slate-300 rounded text-xs focus:ring-1 focus:ring-emerald-500 outline-none">
+                        </div>
+                        <div class="flex gap-2 pt-1">
+                            <button type="submit" id="form-supplier-submit" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-1.5 px-3 rounded text-xs shadow transition">
+                                Salvar Fornecedor
+                            </button>
+                            <button type="button" id="form-supplier-cancel" onclick="cancelEditSupplier()" class="hidden px-3 py-1.5 border border-slate-300 rounded text-xs text-slate-600 hover:bg-slate-100 transition">
+                                Cancelar
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Lista de fornecedores -->
+                    <div class="lg:grid-cols-1 lg:col-span-2 overflow-x-auto bg-white rounded-xl border border-slate-200">
+                        <table class="w-full text-left text-xs font-mono">
+                            <thead>
+                                <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 select-none">
+                                    <th class="p-2">Nome</th>
+                                    <th class="p-2 text-center">Produtos</th>
+                                    <th class="p-2 text-center">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-adm-suppliers" class="divide-y divide-slate-100 text-slate-700">
+                                <tr><td colspan="3" class="p-3 text-center text-slate-400 text-[11px]">Buscando fornecedores cadastrados...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -183,6 +254,11 @@
                 <div>
                     <h2 class="font-bold text-lg text-slate-900" id="display-store-name">Loja</h2>
                     <span id="store-display-user" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">Comprador</span>
+                </div>
+                <!-- Seletor visível apenas quando usuário tem múltiplas lojas -->
+                <div id="store-switcher-wrap" class="hidden ml-3 border-l border-slate-200 pl-3">
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">Loja Ativa</label>
+                    <select id="store-switcher" onchange="switchActiveStore(this.value)" class="text-xs font-mono px-2 py-1 border border-slate-300 rounded bg-white focus:ring-2 focus:ring-blue-500 outline-none"></select>
                 </div>
             </div>
             <div class="flex items-center space-x-4">
@@ -297,7 +373,8 @@
                 name: "Administrador Master",
                 email: MASTER_ADMIN_EMAIL,
                 role: "admin",
-                storeName: "Central"
+                storeName: "Central",
+                allowedStores: ["Central"]
             };
 
             if (masterSnap.exists()) {
@@ -307,7 +384,8 @@
                     name: existing.name || baseData.name,
                     email: MASTER_ADMIN_EMAIL,
                     role: "admin",
-                    storeName: existing.storeName || "Central"
+                    storeName: existing.storeName || "Central",
+                    allowedStores: existing.allowedStores || ["Central"]
                 });
             } else {
                 // Verifica se existe um doc avulso com o mesmo e-mail
@@ -320,7 +398,8 @@
                         name: legacyData.name || baseData.name,
                         email: MASTER_ADMIN_EMAIL,
                         role: "admin",
-                        storeName: legacyData.storeName || "Central"
+                        storeName: legacyData.storeName || "Central",
+                        allowedStores: legacyData.allowedStores || ["Central"]
                     };
                     // Remove legado se o id não for igual ao uid
                     if (legacy.id !== user.uid) {
@@ -334,6 +413,7 @@
         window.state = {
             stores: ["Madri", "Oeste", "Solange", "Parque Oeste"],
             suppliers: [],
+            supplierDocs: [],
             products: [],
             orders: {},
             systemUsers: [],
@@ -407,13 +487,18 @@
 
             // 1. Escutar Fornecedores
             onSnapshot(collection(db, "suppliers"), (snapshot) => {
-                window.state.suppliers = snapshot.docs.map(doc => doc.data().name).sort();
-                if(window.state.suppliers.length === 0) window.state.suppliers = ["Hortifruti Central", "Pomar Vale"];
+                window.state.supplierDocs = snapshot.docs.map(d => ({ id: d.id, name: d.data().name }))
+                    .sort((a, b) => a.name.localeCompare(b.name));
+                window.state.suppliers = window.state.supplierDocs.map(s => s.name);
+                if (window.state.suppliers.length === 0) {
+                    window.state.suppliers = ["Hortifruti Central", "Pomar Vale"];
+                }
                 
                 window.state.suppliers.forEach(s => {
                     if (window.state.expandedAdmin[s] === undefined) window.state.expandedAdmin[s] = true;
                     if (window.state.expandedStore[s] === undefined) window.state.expandedStore[s] = true;
                 });
+                if (window.state.currentUser?.role === "admin") renderAdminSuppliersTable();
                 refreshUI();
             });
 
@@ -445,10 +530,32 @@
                 switchAdminTab("home");
             } else {
                 document.getElementById("screen-store").classList.remove("hidden");
-                document.getElementById("display-store-name").innerText = `Filial: ${window.state.currentUser.storeName}`;
-                document.getElementById("store-display-user").innerText = `Comprador: ${window.state.currentUser.name}`;
+                // Configura loja ativa e seletor multi-loja
+                const u = window.state.currentUser;
+                const allowed = (u.allowedStores && u.allowedStores.length) ? u.allowedStores : (u.storeName ? [u.storeName] : []);
+                if (!u.storeName && allowed.length) u.storeName = allowed[0];
+                document.getElementById("display-store-name").innerText = `Filial: ${u.storeName}`;
+                document.getElementById("store-display-user").innerText = `Comprador: ${u.name}`;
+
+                const wrap = document.getElementById("store-switcher-wrap");
+                const sel = document.getElementById("store-switcher");
+                if (allowed.length > 1) {
+                    sel.innerHTML = allowed.map(s => `<option value="${s}" ${s===u.storeName?'selected':''}>${s}</option>`).join('');
+                    wrap.classList.remove("hidden");
+                } else {
+                    wrap.classList.add("hidden");
+                }
             }
         }
+
+        window.switchActiveStore = function(storeName) {
+            if (!window.state.currentUser) return;
+            const allowed = window.state.currentUser.allowedStores || [window.state.currentUser.storeName];
+            if (!allowed.includes(storeName)) return alert("Você não tem permissão para esta loja.");
+            window.state.currentUser.storeName = storeName;
+            document.getElementById("display-store-name").innerText = `Filial: ${storeName}`;
+            refreshUI();
+        };
 
         function refreshUI() {
             if (window.state.currentUser?.role === "admin") {
@@ -562,7 +669,33 @@
                 document.getElementById("adm-user-store").value = "Central";
             } else {
                 wrapper.classList.remove("opacity-40", "pointer-events-none");
-                document.getElementById("adm-user-store").value = window.state.stores[0];
+                if (window.state.stores.length) {
+                    document.getElementById("adm-user-store").value = window.state.stores[0];
+                }
+            }
+        };
+
+        // Alterna entre "loja única" e "múltiplas lojas"
+        window.renderStoreScopeUI = function(scope) {
+            const single = document.getElementById("adm-store-single-wrap");
+            const multi = document.getElementById("adm-store-multi-wrap");
+            if (scope === "multi") {
+                single.classList.add("hidden");
+                multi.classList.remove("hidden");
+                // Preenche checkboxes se ainda não estiverem
+                const container = document.getElementById("adm-user-stores-checks");
+                if (container && !container.dataset.built) {
+                    container.innerHTML = window.state.stores.map(s => `
+                        <label class="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-2 py-1 hover:border-emerald-400 cursor-pointer">
+                            <input type="checkbox" value="${s}" class="adm-user-store-check accent-emerald-600">
+                            <span>${s}</span>
+                        </label>
+                    `).join('');
+                    container.dataset.built = "1";
+                }
+            } else {
+                multi.classList.add("hidden");
+                single.classList.remove("hidden");
             }
         };
 
@@ -571,34 +704,127 @@
             if (select) {
                 select.innerHTML = window.state.stores.map(s => `<option value="${s}">${s}</option>`).join('');
             }
+            // Reconstrói os checkboxes multi-loja
+            const container = document.getElementById("adm-user-stores-checks");
+            if (container) {
+                container.innerHTML = window.state.stores.map(s => `
+                    <label class="flex items-center gap-1.5 bg-white border border-slate-200 rounded px-2 py-1 hover:border-emerald-400 cursor-pointer">
+                        <input type="checkbox" value="${s}" class="adm-user-store-check accent-emerald-600">
+                        <span>${s}</span>
+                    </label>
+                `).join('');
+                container.dataset.built = "1";
+            }
+        }
+
+        function getSelectedStoreScope() {
+            const scope = document.querySelector('input[name="adm-user-scope"]:checked')?.value || "single";
+            if (scope === "multi") {
+                const checks = Array.from(document.querySelectorAll(".adm-user-store-check:checked")).map(c => c.value);
+                return { scope: "multi", allowedStores: checks };
+            }
+            return { scope: "single", storeName: document.getElementById("adm-user-store").value };
         }
 
         window.adminCreateUser = async function(e) {
             e.preventDefault();
+            const editingId = document.getElementById("adm-user-editing-id").value;
             const name = document.getElementById("adm-user-name").value.trim();
             const email = document.getElementById("adm-user-email").value.trim().toLowerCase();
             const password = document.getElementById("adm-user-pass").value;
             const role = document.getElementById("adm-user-role").value;
-            const storeName = role === "admin" ? "Central" : document.getElementById("adm-user-store").value;
 
-            if (password.length < 6) return alert("A senha precisa ter no mínimo 6 caracteres.");
+            let storeName = "Central";
+            let allowedStores = [];
+            if (role !== "admin") {
+                const sel = getSelectedStoreScope();
+                if (sel.scope === "multi") {
+                    if (!sel.allowedStores.length) return alert("Selecione ao menos uma loja permitida.");
+                    allowedStores = sel.allowedStores;
+                    storeName = allowedStores[0]; // Loja principal (primeira)
+                } else {
+                    storeName = sel.storeName;
+                    allowedStores = [storeName];
+                }
+            } else {
+                allowedStores = ["Central"];
+            }
 
             try {
-                const provisoryId = "prov_" + Date.now();
-                await setDoc(doc(db, "users", provisoryId), {
-                    name,
-                    email,
-                    role,
-                    storeName,
-                    tempPass: password
-                });
-
-                alert(`Credencial de ${name} salva com sucesso!\nO usuário será ativado no primeiro login utilizando este e-mail e senha.`);
-                document.getElementById("form-create-user").reset();
-                toggleStoreSelectVisibility("store");
+                if (editingId) {
+                    // EDIÇÃO: atualiza doc existente (sem alterar senha do Auth)
+                    const updateData = { name, email, role, storeName, allowedStores };
+                    if (password && password.length >= 6) {
+                        // Se ele digitou senha nova e é um doc provisório, atualiza tempPass
+                        const target = window.state.systemUsers.find(u => u.id === editingId);
+                        if (target && target.tempPass) updateData.tempPass = password;
+                    }
+                    await updateDoc(doc(db, "users", editingId), updateData);
+                    alert(`Usuário ${name} atualizado com sucesso!`);
+                    cancelEditUser();
+                } else {
+                    if (password.length < 6) return alert("A senha precisa ter no mínimo 6 caracteres.");
+                    const provisoryId = "prov_" + Date.now();
+                    await setDoc(doc(db, "users", provisoryId), {
+                        name,
+                        email,
+                        role,
+                        storeName,
+                        allowedStores,
+                        tempPass: password
+                    });
+                    alert(`Credencial de ${name} salva com sucesso!\nO usuário será ativado no primeiro login utilizando este e-mail e senha.`);
+                    document.getElementById("form-create-user").reset();
+                    toggleStoreSelectVisibility("store");
+                    renderStoreScopeUI("single");
+                }
             } catch (err) {
                 alert("Erro ao salvar usuário no Firestore: " + err.message);
             }
+        };
+
+        window.editSystemUser = function(userId) {
+            const u = window.state.systemUsers.find(x => x.id === userId);
+            if (!u) return;
+            document.getElementById("adm-user-editing-id").value = u.id;
+            document.getElementById("adm-user-name").value = u.name || "";
+            document.getElementById("adm-user-email").value = u.email || "";
+            document.getElementById("adm-user-pass").required = false;
+            document.getElementById("adm-user-pass").value = "";
+            document.getElementById("adm-user-role").value = u.role || "store";
+            toggleStoreSelectVisibility(u.role || "store");
+
+            // Escopo
+            const allowed = u.allowedStores || (u.storeName ? [u.storeName] : []);
+            const isMulti = allowed.length > 1;
+            const radio = document.querySelector(`input[name="adm-user-scope"][value="${isMulti ? "multi" : "single"}"]`);
+            if (radio) radio.checked = true;
+            renderStoreScopeUI(isMulti ? "multi" : "single");
+            if (isMulti) {
+                document.querySelectorAll(".adm-user-store-check").forEach(c => {
+                    c.checked = allowed.includes(c.value);
+                });
+            } else {
+                document.getElementById("adm-user-store").value = u.storeName || (window.state.stores[0] || "Central");
+            }
+
+            document.getElementById("form-user-title").innerText = `Editando: ${u.name}`;
+            document.getElementById("form-user-submit").innerText = "Atualizar Credencial";
+            document.getElementById("form-user-cancel").classList.remove("hidden");
+            document.getElementById("adm-pass-hint").innerText = "(deixe em branco para manter)";
+            document.getElementById("form-create-user").scrollIntoView({ behavior: "smooth", block: "center" });
+        };
+
+        window.cancelEditUser = function() {
+            document.getElementById("adm-user-editing-id").value = "";
+            document.getElementById("form-create-user").reset();
+            document.getElementById("adm-user-pass").required = true;
+            document.getElementById("form-user-title").innerText = "Novo Cadastro";
+            document.getElementById("form-user-submit").innerText = "Salvar Credencial";
+            document.getElementById("form-user-cancel").classList.add("hidden");
+            document.getElementById("adm-pass-hint").innerText = "(obrigatória no cadastro)";
+            toggleStoreSelectVisibility("store");
+            renderStoreScopeUI("single");
         };
 
         window.deleteSystemUser = async function(userId, userName) {
@@ -621,16 +847,118 @@
                 const roleBadge = u.role === 'admin' 
                     ? `<span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-full">ADMIN</span>`
                     : `<span class="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded-full">COMPRADOR</span>`;
+
+                const stores = u.allowedStores && u.allowedStores.length
+                    ? u.allowedStores
+                    : (u.storeName ? [u.storeName] : ["—"]);
+                const storesBadges = stores.map(s => `<span class="inline-block bg-slate-100 border border-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded mr-1 mb-0.5">${s}</span>`).join("");
+
+                const isSelf = u.id === window.state.currentUser.uid;
                 
                 return `
                     <tr class="hover:bg-slate-50">
-                        <td class="p-2 font-bold text-slate-900">${u.name}</td>
-                        <td class="p-2 text-slate-600">${u.email}</td>
+                        <td class="p-2 font-bold text-slate-900">${u.name || "—"}</td>
+                        <td class="p-2 text-slate-600">${u.email || "—"}</td>
                         <td class="p-2 text-center">${roleBadge}</td>
-                        <td class="p-2 text-center font-bold text-slate-700">${u.storeName || 'Central'}</td>
-                        <td class="p-2 text-center">
-                            <button onclick="deleteSystemUser('${u.id}', '${u.name}')" class="text-red-500 hover:text-red-700 transition">
+                        <td class="p-2">${storesBadges}</td>
+                        <td class="p-2 text-center whitespace-nowrap">
+                            <button data-testid="edit-user-${u.id}" onclick="editSystemUser('${u.id}')" class="text-blue-600 hover:text-blue-800 transition mr-1.5" title="Editar">
+                                <i data-lucide="edit-3" class="w-4 h-4 inline"></i>
+                            </button>
+                            <button data-testid="delete-user-${u.id}" onclick="deleteSystemUser('${u.id}', '${(u.name||'').replace(/'/g,"\\'")}')" ${isSelf ? 'disabled class="text-slate-300 cursor-not-allowed"' : 'class="text-red-500 hover:text-red-700 transition"'} title="${isSelf ? 'Você mesmo' : 'Excluir'}">
                                 <i data-lucide="user-x" class="w-4 h-4 inline"></i>
+                            </button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+            lucide.createIcons();
+        }
+
+        // --- FORNECEDORES: CRUD ---
+        window.saveSupplier = async function(e) {
+            e.preventDefault();
+            const editingId = document.getElementById("adm-supplier-editing-id").value;
+            const name = document.getElementById("adm-supplier-name").value.trim();
+            if (!name) return;
+
+            // Evita duplicatas (case-insensitive), exceto se estiver editando o próprio
+            const dup = window.state.supplierDocs.find(s => s.name.toLowerCase() === name.toLowerCase() && s.id !== editingId);
+            if (dup) return alert(`Já existe um fornecedor com este nome: "${dup.name}".`);
+
+            try {
+                if (editingId) {
+                    const oldName = window.state.supplierDocs.find(s => s.id === editingId)?.name;
+                    await updateDoc(doc(db, "suppliers", editingId), { name });
+                    // Se o nome mudou, atualiza todos os produtos vinculados
+                    if (oldName && oldName !== name) {
+                        const prods = window.state.products.filter(p => p.supplier === oldName);
+                        await Promise.all(prods.map(p => updateDoc(doc(db, "products", p.id), { supplier: name })));
+                    }
+                    cancelEditSupplier();
+                } else {
+                    await addDoc(collection(db, "suppliers"), { name });
+                    document.getElementById("form-supplier").reset();
+                }
+            } catch (err) {
+                alert("Erro ao salvar fornecedor: " + err.message);
+            }
+        };
+
+        window.editSupplier = function(supplierId) {
+            const s = window.state.supplierDocs.find(x => x.id === supplierId);
+            if (!s) return;
+            document.getElementById("adm-supplier-editing-id").value = s.id;
+            document.getElementById("adm-supplier-name").value = s.name;
+            document.getElementById("form-supplier-title").innerText = `Editando: ${s.name}`;
+            document.getElementById("form-supplier-submit").innerText = "Atualizar Fornecedor";
+            document.getElementById("form-supplier-cancel").classList.remove("hidden");
+            document.getElementById("form-supplier").scrollIntoView({ behavior: "smooth", block: "center" });
+        };
+
+        window.cancelEditSupplier = function() {
+            document.getElementById("adm-supplier-editing-id").value = "";
+            document.getElementById("form-supplier").reset();
+            document.getElementById("form-supplier-title").innerText = "Novo Fornecedor";
+            document.getElementById("form-supplier-submit").innerText = "Salvar Fornecedor";
+            document.getElementById("form-supplier-cancel").classList.add("hidden");
+        };
+
+        window.deleteSupplier = async function(supplierId) {
+            const s = window.state.supplierDocs.find(x => x.id === supplierId);
+            if (!s) return;
+            const linkedProducts = window.state.products.filter(p => p.supplier === s.name);
+            const msg = linkedProducts.length
+                ? `O fornecedor "${s.name}" possui ${linkedProducts.length} produto(s) vinculado(s).\nEles TAMBÉM serão excluídos.\n\nConfirmar exclusão?`
+                : `Excluir fornecedor "${s.name}"?`;
+            if (!confirm(msg)) return;
+            try {
+                await Promise.all(linkedProducts.map(p => deleteDoc(doc(db, "products", p.id))));
+                await deleteDoc(doc(db, "suppliers", supplierId));
+            } catch (err) {
+                alert("Erro ao excluir fornecedor: " + err.message);
+            }
+        };
+
+        function renderAdminSuppliersTable() {
+            const tbody = document.getElementById("table-adm-suppliers");
+            if (!tbody) return;
+            if (!window.state.supplierDocs.length) {
+                tbody.innerHTML = `<tr><td colspan="3" class="p-3 text-center text-slate-400">Nenhum fornecedor cadastrado ainda.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = window.state.supplierDocs.map(s => {
+                const count = window.state.products.filter(p => p.supplier === s.name).length;
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-2 font-bold text-slate-900">${s.name}</td>
+                        <td class="p-2 text-center text-slate-600">${count}</td>
+                        <td class="p-2 text-center whitespace-nowrap">
+                            <button data-testid="edit-supplier-${s.id}" onclick="editSupplier('${s.id}')" class="text-blue-600 hover:text-blue-800 transition mr-1.5" title="Editar">
+                                <i data-lucide="edit-3" class="w-4 h-4 inline"></i>
+                            </button>
+                            <button data-testid="delete-supplier-${s.id}" onclick="deleteSupplier('${s.id}')" class="text-red-500 hover:text-red-700 transition" title="Excluir">
+                                <i data-lucide="trash-2" class="w-4 h-4 inline"></i>
                             </button>
                         </td>
                     </tr>
@@ -644,22 +972,15 @@
             return `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
         }
 
-        window.quickAddSupplier = async function() {
-            const val = document.getElementById("quick-supplier").value.trim();
-            if(val && !window.state.suppliers.includes(val)) {
-                await addDoc(collection(db, "suppliers"), { name: val });
-                document.getElementById("quick-supplier").value = "";
-            }
-        };
-
         window.addNewRow = async function() {
             const target = document.getElementById("add-target-supplier").value;
-            if(!target) return alert("Selecione ou crie um fornecedor primeiro.");
+            if(!target) return alert("Selecione ou crie um fornecedor primeiro (aba Cadastros).");
 
             await addDoc(collection(db, "products"), {
                 supplier: target,
                 name: "Novo Item Cadastrado",
                 unitQty: 1,
+                unitMeasure: "un",
                 boxPrice: 0.00,
                 cost: 0.00,
                 priceType: "all",
@@ -835,9 +1156,12 @@
                             let pricingHtml = "";
                             if(p.priceType === 'all') {
                                 pricingHtml = `
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-slate-400 text-[10px] font-bold">GERAL:</span>
-                                        <input type="number" step="0.01" value="${p.saleAll}" onchange="updateCell('${p.id}', 'saleAll', this.value)" class="excel-input bg-amber-50 px-1.5 py-0.5 border border-slate-300 text-center font-bold w-20 rounded text-xs outline-none">
+                                    <div class="flex items-center gap-1.5">
+                                        <span class="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Geral</span>
+                                        <div class="flex items-center bg-amber-50 border border-amber-300 rounded focus-within:ring-2 focus-within:ring-amber-400">
+                                            <span class="text-[10px] text-amber-800 font-bold px-1.5 select-none">R$</span>
+                                            <input type="number" step="0.01" min="0" value="${(p.saleAll || 0).toFixed(2)}" onchange="updateCell('${p.id}', 'saleAll', this.value)" class="bg-transparent p-1 text-right font-bold w-20 text-xs outline-none text-amber-900">
+                                        </div>
                                     </div>
                                 `;
                             } else {
@@ -850,7 +1174,10 @@
                                     `).join('');
                                     return `
                                         <div class="flex items-center gap-1 mb-1 border-b border-slate-100 pb-1 last:border-0">
-                                            <input type="number" step="0.01" value="${rule.value}" onchange="updateMultiValue('${p.id}', ${rIdx}, this.value)" class="excel-input bg-emerald-50 px-1 w-16 text-center border border-slate-300 font-bold rounded text-xs outline-none">
+                                            <div class="flex items-center bg-emerald-50 border border-emerald-300 rounded focus-within:ring-2 focus-within:ring-emerald-400">
+                                                <span class="text-[10px] text-emerald-800 font-bold px-1 select-none">R$</span>
+                                                <input type="number" step="0.01" min="0" value="${(parseFloat(rule.value)||0).toFixed(2)}" onchange="updateMultiValue('${p.id}', ${rIdx}, this.value)" class="bg-transparent px-1 py-0.5 w-16 text-right font-bold rounded text-xs outline-none text-emerald-900">
+                                            </div>
                                             <div class="flex flex-wrap gap-0.5 flex-1">${storeChecks}</div>
                                             <button onclick="removeMultiPriceRow('${p.id}', ${rIdx})" class="text-red-500 font-bold px-1 hover:text-red-700">&times;</button>
                                         </div>
@@ -878,14 +1205,33 @@
                                     <td class="p-1 border-r border-slate-200 w-48">
                                         <input type="text" value="${p.name}" onchange="updateCell('${p.id}', 'name', this.value)" class="excel-input w-full bg-transparent p-0.5 font-bold text-slate-900 border border-transparent focus:bg-white text-xs rounded outline-none">
                                     </td>
-                                    <td class="p-1 border-r border-slate-200 w-16">
-                                        <input type="number" min="1" value="${p.unitQty || 1}" onchange="updateCell('${p.id}', 'unitQty', this.value)" class="excel-input w-full bg-transparent p-0.5 text-center text-slate-800 border border-transparent focus:bg-white text-xs rounded outline-none">
+                                    <td class="p-1 border-r border-slate-200 w-28">
+                                        <div class="flex items-center gap-1">
+                                            <input type="number" min="0" step="0.01" value="${p.unitQty || 1}" onchange="updateCell('${p.id}', 'unitQty', this.value)" class="excel-input w-14 bg-transparent p-0.5 text-center text-slate-800 border border-transparent focus:bg-white text-xs rounded outline-none">
+                                            <select onchange="updateCell('${p.id}', 'unitMeasure', this.value)" class="excel-input bg-transparent p-0.5 text-[10px] border border-transparent focus:bg-white rounded outline-none font-bold text-slate-600">
+                                                <option value="un" ${(p.unitMeasure||'un')==='un'?'selected':''}>un</option>
+                                                <option value="kg" ${p.unitMeasure==='kg'?'selected':''}>kg</option>
+                                                <option value="g"  ${p.unitMeasure==='g'?'selected':''}>g</option>
+                                                <option value="cx" ${p.unitMeasure==='cx'?'selected':''}>cx</option>
+                                                <option value="dz" ${p.unitMeasure==='dz'?'selected':''}>dz</option>
+                                                <option value="sc" ${p.unitMeasure==='sc'?'selected':''}>sc</option>
+                                                <option value="l"  ${p.unitMeasure==='l'?'selected':''}>L</option>
+                                                <option value="ml" ${p.unitMeasure==='ml'?'selected':''}>ml</option>
+                                                <option value="pct" ${p.unitMeasure==='pct'?'selected':''}>pct</option>
+                                            </select>
+                                        </div>
                                     </td>
-                                    <td class="p-1 border-r border-slate-200 w-24">
-                                        <input type="number" step="0.01" value="${p.boxPrice || 0}" onchange="updateCell('${p.id}', 'boxPrice', this.value)" class="excel-input w-full bg-transparent p-0.5 text-center text-slate-800 font-medium border border-transparent focus:bg-white text-xs rounded outline-none">
+                                    <td class="p-1 border-r border-slate-200 w-28">
+                                        <div class="flex items-center bg-emerald-50/40 border border-emerald-200 rounded focus-within:ring-2 focus-within:ring-emerald-400 focus-within:bg-white transition">
+                                            <span class="text-[10px] text-emerald-700 font-bold px-1.5 select-none">R$</span>
+                                            <input type="number" step="0.01" min="0" value="${(p.boxPrice || 0).toFixed(2)}" onchange="updateCell('${p.id}', 'boxPrice', this.value)" class="w-full bg-transparent p-1 text-right text-slate-900 font-bold text-xs outline-none">
+                                        </div>
                                     </td>
-                                    <td class="p-1 border-r border-slate-200 w-24 bg-slate-50/50">
-                                        <input type="text" readonly value="R$ ${(p.cost || 0).toFixed(2)}" class="w-full bg-transparent p-0.5 text-center text-slate-500 font-bold border border-transparent text-xs outline-none cursor-not-allowed">
+                                    <td class="p-1 border-r border-slate-200 w-24 bg-slate-50/60">
+                                        <div class="flex items-center bg-white/70 border border-slate-200 rounded">
+                                            <span class="text-[10px] text-slate-500 font-bold px-1.5 select-none">R$</span>
+                                            <input type="text" readonly value="${(p.cost || 0).toFixed(2)}" class="w-full bg-transparent p-1 text-right text-slate-600 font-bold text-xs outline-none cursor-not-allowed">
+                                        </div>
                                     </td>
                                     <td class="p-1 border-r border-slate-200 w-28">
                                         <select onchange="changePriceType('${p.id}', this.value)" class="excel-input w-full bg-transparent p-0.5 text-[11px] border border-transparent focus:bg-white rounded outline-none">
@@ -913,8 +1259,8 @@
                                     <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 select-none">
                                         <th class="p-1 border-r border-slate-200 text-center w-8">Ref</th>
                                         <th class="p-1 border-r border-slate-200">Nome do Produto</th>
-                                        <th class="p-1 border-r border-slate-200 text-center">Unidade (Kg/Un)</th>
-                                        <th class="p-1 border-r border-slate-200 text-center">Preço Caixa</th>
+                                        <th class="p-1 border-r border-slate-200 text-center">Unidade / Medida</th>
+                                        <th class="p-1 border-r border-slate-200 text-center">Preço de Compra</th>
                                         <th class="p-1 border-r border-slate-200 text-center bg-slate-200/50 text-slate-700">Custo Un.</th>
                                         <th class="p-1 border-r border-slate-200">Escopo</th>
                                         <th class="p-1 border-r border-slate-200">Configurações Filiais</th>
