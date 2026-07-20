@@ -17,6 +17,12 @@ App full HTML (single-file `index.html`) com Firebase (Auth + Firestore) para ge
 - **Compradores (store)**: fazem pedidos por filial (Madri, Oeste, Solange, Parque Oeste)
 
 ## Implemented
+- 2026-01-20: **Quantidades fracionadas + limpeza mobile no card de Pedido**
+  - Input de quantidade no card "Fazer Pedido" (comprador) e nas colunas por loja do painel ADM agora aceita valores decimais (`type=number step=0.5 inputmode=decimal`). Ex: 0,5 kg / 1,5 / 2,5 — ideal para "meio kg" ou "metade da caixa".
+  - `updateStoreQuantity` e `updateStoreQuantityFromAdmin` usam `parseFloat` (com replace de vírgula por ponto) em vez de `parseInt`.
+  - Cart badge (`badge-total-items`), coluna Total do ADM e modal "Visualizar Pedido" exibem quantidade formatada em pt-BR com vírgula decimal (`toLocaleString('pt-BR')`).
+  - **REMOVIDO** do card de pedido do comprador: badge âmbar "Alterado Hoje" ao lado do nome e span "Modificado por Central: {nome}" abaixo — ambos quebravam o layout mobile. Alterações do dia continuam sinalizadas de forma limpa via badge inline `anterior → atual` ao lado do preço + banner no topo.
+  - Regressão: histórico de preço de venda, banner + som de notificação continuam funcionando normalmente (testing_agent 100% frontend).
 - 2026-01-20: **Histórico de alteração do Preço de Venda no card "Fazer Pedido"**
   - Cada mudança do `saleAll` (Todas as Lojas) ou de um item de `multiPrices` grava uma entrada em `products/{id}.priceHistory` via `arrayUnion` — nunca sobrescreve; histórico cresce por dia.
   - Estrutura da entrada: `{ prev, next, ts, date, time, user, stores }` — `stores = "all"` ou array com as filiais afetadas por aquela regra multi.
