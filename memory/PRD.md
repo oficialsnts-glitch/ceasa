@@ -17,6 +17,12 @@ App full HTML (single-file `index.html`) com Firebase (Auth + Firestore) para ge
 - **Compradores (store)**: fazem pedidos por filial (Madri, Oeste, Solange, Parque Oeste)
 
 ## Implemented
+- 2026-01-20: **Cards do ADM iniciam fechados + ordenação alfabética**
+  - Todos os cards de fornecedor no painel ADM começam **fechados**; abrem apenas com clique no header (evita scroll infinito ao entrar na Home com muitos fornecedores)
+  - Cada card exibe badge com **contador de produtos** ao lado do nome
+  - Botão de ordenação alfabética `A → Z` / `Z → A` no header do card (ícone `arrow-down-a-z` / `arrow-up-a-z`), com `event.stopPropagation()` para não confundir com o clique de abrir/fechar
+  - Comparação usa `localeCompare(..., 'pt-BR', { sensitivity: 'base' })` (respeita acentuação e caixa)
+  - Comprador (store) também recebe ordenação A→Z automática dos produtos dentro de cada fornecedor — melhora muito a busca visual
 - 2026-01-20: **Coluna "Nome do Produto" fixa (sticky) durante rolagem horizontal**
   - Admin: coluna Ref foi consolidada num badge dentro da célula do Nome (economiza espaço, evita duas colunas fixas)
   - CSS `.table-sticky-first` reforçado: sombra direita mais visível (`6px 0 6px -4px`), borda separadora, fundos opacos preservados no hover e em linhas destacadas (`row-highlight`)

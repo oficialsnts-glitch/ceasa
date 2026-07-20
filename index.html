@@ -572,7 +572,8 @@
             currentUser: null, 
             activeTab: 'order',
             expandedAdmin: {},
-            expandedStore: {}
+            expandedStore: {},
+            sortAdmin: {}
         };
 
         // Escuta o estado da Autenticação do Firebase
@@ -644,8 +645,12 @@
                 window.state.suppliers = window.state.supplierDocs.map(s => s.name);
 
                 window.state.suppliers.forEach(s => {
-                    if (window.state.expandedAdmin[s] === undefined) window.state.expandedAdmin[s] = true;
+                    // ADM: cards INICIAM FECHADOS (só abrem ao clicar)
+                    if (window.state.expandedAdmin[s] === undefined) window.state.expandedAdmin[s] = false;
+                    // Comprador: mantém aberto por padrão (é o fluxo principal dele)
                     if (window.state.expandedStore[s] === undefined) window.state.expandedStore[s] = true;
+                    // Ordenação alfabética A→Z como padrão em cada fornecedor
+                    if (window.state.sortAdmin[s] === undefined) window.state.sortAdmin[s] = "asc";
                 });
                 if (window.state.currentUser?.role === "admin") renderAdminSuppliersTable();
                 refreshUI();
@@ -1377,6 +1382,11 @@
         };
 
         window.toggleAdminSup = function(sup) { window.state.expandedAdmin[sup] = !window.state.expandedAdmin[sup]; renderAdminDashboard(); }
+        window.toggleAdminSort = function(sup) {
+            const cur = window.state.sortAdmin[sup] || "asc";
+            window.state.sortAdmin[sup] = cur === "asc" ? "desc" : "asc";
+            renderAdminDashboard();
+        };
         window.toggleStoreSup = function(sup) { window.state.expandedStore[sup] = !window.state.expandedStore[sup]; renderStoreCatalog(); }
 
         window.switchStoreCard = function(cardType) {
@@ -1441,8 +1451,15 @@
             }
 
             window.state.suppliers.forEach(supplier => {
-                const isExpanded = window.state.expandedAdmin[supplier] !== false;
-                const filtered = window.state.products.filter(p => p.supplier === supplier);
+                const isExpanded = window.state.expandedAdmin[supplier] === true;
+                const sortDir = window.state.sortAdmin[supplier] || "asc";
+                const filtered = window.state.products
+                    .filter(p => p.supplier === supplier)
+                    .slice()
+                    .sort((a, b) => {
+                        const cmp = (a.name || "").localeCompare(b.name || "", "pt-BR", { sensitivity: "base" });
+                        return sortDir === "asc" ? cmp : -cmp;
+                    });
                 let bodyHtml = "";
 
                 if(isExpanded) {
@@ -1574,14 +1591,29 @@
                     `;
                 }
 
+                const sortBtn = isExpanded ? `
+                    <button onclick="event.stopPropagation(); toggleAdminSort('${supplier}')"
+                        data-testid="sort-btn-${supplier}"
+                        title="Alterar ordem alfabética"
+                        class="inline-flex items-center gap-1 bg-slate-700 hover:bg-slate-600 border border-slate-500 rounded px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-100 transition">
+                        <i data-lucide="${sortDir === 'asc' ? 'arrow-down-a-z' : 'arrow-up-a-z'}" class="w-3.5 h-3.5"></i>
+                        <span>${sortDir === 'asc' ? 'A → Z' : 'Z → A'}</span>
+                    </button>` : "";
+
+                const countBadge = `<span class="inline-flex items-center justify-center bg-slate-600 text-slate-100 text-[10px] font-bold rounded-full px-2 py-0.5 min-w-[22px]">${filtered.length}</span>`;
+
                 container.innerHTML += `
                     <div class="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-4">
-                        <div onclick="toggleAdminSup('${supplier}')" class="bg-slate-800 text-white px-4 py-2.5 flex justify-between items-center cursor-pointer hover:bg-slate-800/95 transition select-none">
-                            <div class="flex items-center space-x-2">
-                                <i data-lucide="truck" class="w-4 h-4 text-emerald-400"></i>
-                                <span class="font-bold text-xs uppercase font-mono tracking-wider">${supplier}</span>
+                        <div onclick="toggleAdminSup('${supplier}')" data-testid="adm-sup-header-${supplier}" class="bg-slate-800 text-white px-3 md:px-4 py-2.5 flex justify-between items-center gap-3 cursor-pointer hover:bg-slate-800/95 transition select-none">
+                            <div class="flex items-center space-x-2 min-w-0 flex-1">
+                                <i data-lucide="truck" class="w-4 h-4 text-emerald-400 shrink-0"></i>
+                                <span class="font-bold text-xs uppercase font-mono tracking-wider truncate">${supplier}</span>
+                                ${countBadge}
                             </div>
-                            <i data-lucide="${isExpanded?'chevron-up':'chevron-down'}" class="w-4 h-4 text-slate-400"></i>
+                            <div class="flex items-center gap-2 shrink-0">
+                                ${sortBtn}
+                                <i data-lucide="${isExpanded?'chevron-up':'chevron-down'}" class="w-4 h-4 text-slate-400"></i>
+                            </div>
                         </div>
                         ${bodyHtml}
                     </div>
@@ -1613,6 +1645,8 @@
 
             for(const supplier in grouped) {
                 const isExpanded = window.state.expandedStore[supplier] !== false;
+                // Ordena os produtos do fornecedor em ordem alfabética (A→Z) para facilitar a busca
+                grouped[supplier].sort((a, b) => (a.product.name || "").localeCompare(b.product.name || "", "pt-BR", { sensitivity: "base" }));
                 let accordionTable = "";
 
                 if(isExpanded) {
