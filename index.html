@@ -555,6 +555,13 @@
         // Se não existir no Firebase Auth, será criado automaticamente
         // no primeiro login usando a senha digitada.
         const MASTER_ADMIN_EMAIL = "oficialsnts@gmail.com";
+        // Exposto para as funções window.* poderem validar (blindagem contra
+        // edição/exclusão do ADM master pelo painel de usuários)
+        window.MASTER_ADMIN_EMAIL = MASTER_ADMIN_EMAIL;
+        window.isMasterUser = function(u) {
+            if (!u) return false;
+            return (String(u.email || "").trim().toLowerCase() === MASTER_ADMIN_EMAIL);
+        };
 
         async function ensureMasterAdminProfile(user) {
             // Garante que exista um documento em users/{uid} com role=admin
@@ -945,6 +952,17 @@
             const password = document.getElementById("adm-user-pass").value;
             const role = document.getElementById("adm-user-role").value;
 
+            // Blindagem: nunca permitir criar/editar registro com o e-mail do ADM master
+            if (email === window.MASTER_ADMIN_EMAIL) {
+                return alert("🛡️ O e-mail do ADM Master é reservado. Não é possível cadastrar/editar outro usuário com este e-mail.");
+            }
+            if (editingId) {
+                const target = window.state.systemUsers.find(u => u.id === editingId);
+                if (window.isMasterUser(target)) {
+                    return alert("🛡️ O ADM Master é uma conta blindada e não pode ser editada.");
+                }
+            }
+
             let storeName = "Central";
             let allowedStores = [];
             if (role !== "admin") {
@@ -997,6 +1015,10 @@
         window.editSystemUser = function(userId) {
             const u = window.state.systemUsers.find(x => x.id === userId);
             if (!u) return;
+            // Blindagem: conta master é imutável pela UI
+            if (window.isMasterUser(u)) {
+                return alert("🛡️ O ADM Master é uma conta blindada e não pode ser editada.");
+            }
             document.getElementById("adm-user-editing-id").value = u.id;
             document.getElementById("adm-user-name").value = u.name || "";
             document.getElementById("adm-user-email").value = u.email || "";
@@ -1040,6 +1062,11 @@
 
         window.deleteSystemUser = async function(userId, userName) {
             if (userId === window.state.currentUser.uid) return alert("Você não pode excluir a sua própria conta ativa.");
+            const target = window.state.systemUsers.find(x => x.id === userId);
+            // Blindagem: conta master nunca pode ser removida
+            if (window.isMasterUser(target)) {
+                return alert("🛡️ O ADM Master é uma conta blindada e não pode ser removida.");
+            }
             if (confirm(`Deseja remover permanentemente o acesso de ${userName}?`)) {
                 await deleteDoc(doc(db, "users", userId));
             }
@@ -1065,20 +1092,37 @@
                 const storesBadges = stores.map(s => `<span class="inline-block bg-slate-100 border border-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded mr-1 mb-0.5">${s}</span>`).join("");
 
                 const isSelf = u.id === window.state.currentUser.uid;
-                
+                const isMaster = window.isMasterUser(u);
+
+                // Selo visual do ADM Master (blindado)
+                const masterShield = isMaster
+                    ? `<span title="Conta blindada" class="ml-1.5 inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-300 text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full font-mono">
+                        <i data-lucide="shield-check" class="w-2.5 h-2.5"></i> Master
+                       </span>`
+                    : "";
+
+                // Ações: para o master, botões viram um cadeado desabilitado
+                const actionsCell = isMaster
+                    ? `<span data-testid="master-locked-${u.id}" title="ADM Master blindado — não pode ser editado nem excluído" class="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded font-bold text-[10px] uppercase tracking-wide">
+                        <i data-lucide="lock" class="w-3.5 h-3.5"></i> Blindado
+                       </span>`
+                    : `
+                        <button data-testid="edit-user-${u.id}" onclick="editSystemUser('${u.id}')" class="text-blue-600 hover:text-blue-800 transition mr-1.5" title="Editar">
+                            <i data-lucide="edit-3" class="w-4 h-4 inline"></i>
+                        </button>
+                        <button data-testid="delete-user-${u.id}" onclick="deleteSystemUser('${u.id}', '${(u.name||'').replace(/'/g,"\\'")}')" ${isSelf ? 'disabled class="text-slate-300 cursor-not-allowed"' : 'class="text-red-500 hover:text-red-700 transition"'} title="${isSelf ? 'Você mesmo' : 'Excluir'}">
+                            <i data-lucide="user-x" class="w-4 h-4 inline"></i>
+                        </button>
+                    `;
+
                 return `
-                    <tr class="hover:bg-slate-50">
-                        <td class="p-2 font-bold text-slate-900">${u.name || "—"}</td>
+                    <tr class="hover:bg-slate-50${isMaster ? ' bg-emerald-50/30' : ''}">
+                        <td class="p-2 font-bold text-slate-900">${u.name || "—"}${masterShield}</td>
                         <td class="p-2 text-slate-600">${u.email || "—"}</td>
                         <td class="p-2 text-center">${roleBadge}</td>
                         <td class="p-2">${storesBadges}</td>
                         <td class="p-2 text-center whitespace-nowrap">
-                            <button data-testid="edit-user-${u.id}" onclick="editSystemUser('${u.id}')" class="text-blue-600 hover:text-blue-800 transition mr-1.5" title="Editar">
-                                <i data-lucide="edit-3" class="w-4 h-4 inline"></i>
-                            </button>
-                            <button data-testid="delete-user-${u.id}" onclick="deleteSystemUser('${u.id}', '${(u.name||'').replace(/'/g,"\\'")}')" ${isSelf ? 'disabled class="text-slate-300 cursor-not-allowed"' : 'class="text-red-500 hover:text-red-700 transition"'} title="${isSelf ? 'Você mesmo' : 'Excluir'}">
-                                <i data-lucide="user-x" class="w-4 h-4 inline"></i>
-                            </button>
+                            ${actionsCell}
                         </td>
                     </tr>
                 `;
