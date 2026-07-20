@@ -17,6 +17,11 @@ App full HTML (single-file `index.html`) com Firebase (Auth + Firestore) para ge
 - **Compradores (store)**: fazem pedidos por filial (Madri, Oeste, Solange, Parque Oeste)
 
 ## Implemented
+- 2026-01-20: **Coluna "Nome do Produto" fixa (sticky) durante rolagem horizontal**
+  - Admin: coluna Ref foi consolidada num badge dentro da célula do Nome (economiza espaço, evita duas colunas fixas)
+  - CSS `.table-sticky-first` reforçado: sombra direita mais visível (`6px 0 6px -4px`), borda separadora, fundos opacos preservados no hover e em linhas destacadas (`row-highlight`)
+  - Comprador (store): Nome do Produto já era a primeira coluna, sticky ativa
+  - Testado: com 400px de scroll lateral, Nome permanece em `left:13px` (fixo). Restante das colunas (Unidade, Preços, Filiais, Total, Ações) rola normalmente.
 - 2026-01-20: **Formulário de inserção rápida na Home**
   - Barra de ações agora contém: Fornecedor, Nome do Produto, Preço de Compra (com máscara BRL), Quantidade e Unidade (un/kg/g/cx/dz/sc/L/ml/pct)
   - Ao clicar "Inserir Produto" o item é gravado no Firestore já com todos os campos preenchidos e o Custo Unitário recalculado

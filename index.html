@@ -64,8 +64,23 @@
 
         /* Primeira coluna sticky em tabelas grandes (nome do produto) */
         .table-sticky-first thead th:first-child,
-        .table-sticky-first tbody td:first-child { position: sticky; left: 0; z-index: 3; background: #fff; box-shadow: 2px 0 4px -2px rgba(0,0,0,.15); }
-        .table-sticky-first thead th:first-child { background: #f1f5f9; z-index: 4; }
+        .table-sticky-first tbody td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 3;
+            background: #ffffff;
+            /* Sombra à direita para deixar CLARO que a coluna está fixa e o resto rola */
+            box-shadow: 6px 0 6px -4px rgba(15, 23, 42, .22);
+            border-right: 2px solid #e2e8f0;
+        }
+        .table-sticky-first thead th:first-child {
+            background: #f1f5f9;
+            z-index: 4;
+        }
+        /* Realce da linha ao passar o mouse mantém o sticky opaco */
+        .table-sticky-first tbody tr:hover td:first-child { background: #f8fafc; }
+        /* Se a linha tem destaque (âmbar - alterado hoje) o sticky segue a cor */
+        .table-sticky-first tbody tr.row-highlight td:first-child { background: #fef3c7; }
 
         /* Melhor tap targets no mobile */
         @media (max-width: 768px) {
@@ -1433,7 +1448,7 @@
                 if(isExpanded) {
                     let rowsHtml = "";
                     if(filtered.length === 0) {
-                        rowsHtml = `<tr><td colspan="${9 + window.state.stores.length}" class="p-4 text-center text-slate-400 text-xs">Nenhum produto cadastrado para este fornecedor.</td></tr>`;
+                        rowsHtml = `<tr><td colspan="${8 + window.state.stores.length}" class="p-4 text-center text-slate-400 text-xs">Nenhum produto cadastrado para este fornecedor.</td></tr>`;
                     } else {
                         filtered.forEach((p, index) => {
                             let pricingHtml = "";
@@ -1484,9 +1499,11 @@
 
                             rowsHtml += `
                                 <tr class="hover:bg-slate-50/70 transition border-b border-slate-200">
-                                    <td class="p-1 border-r border-slate-200 text-center font-bold text-slate-400 w-8">${index+1}</td>
-                                    <td class="p-1 border-r border-slate-200 w-48">
-                                        <input type="text" value="${p.name}" onchange="updateCell('${p.id}', 'name', this.value)" class="excel-input w-full bg-transparent p-0.5 font-bold text-slate-900 border border-transparent focus:bg-white text-xs rounded outline-none">
+                                    <td class="p-1 border-r border-slate-200 w-56 min-w-[180px]">
+                                        <div class="flex items-center gap-1.5">
+                                            <span class="inline-flex items-center justify-center min-w-[22px] h-[22px] px-1 rounded bg-slate-200 text-slate-600 text-[10px] font-bold shrink-0">${index+1}</span>
+                                            <input type="text" value="${p.name}" onchange="updateCell('${p.id}', 'name', this.value)" class="excel-input flex-1 min-w-0 bg-transparent p-0.5 font-bold text-slate-900 border border-transparent focus:bg-white text-xs rounded outline-none">
+                                        </div>
                                     </td>
                                     <td class="p-1 border-r border-slate-200 w-28">
                                         <div class="flex items-center gap-1">
@@ -1540,8 +1557,7 @@
                             <table class="w-full text-left text-xs border-collapse font-mono table-sticky-first">
                                 <thead>
                                     <tr class="bg-slate-100 border-b border-slate-200 text-slate-600 select-none">
-                                        <th class="p-1 border-r border-slate-200 text-center w-8">Ref</th>
-                                        <th class="p-1 border-r border-slate-200">Nome do Produto</th>
+                                        <th class="p-1 border-r border-slate-200 min-w-[180px]">Nome do Produto</th>
                                         <th class="p-1 border-r border-slate-200 text-center">Unidade / Medida</th>
                                         <th class="p-1 border-r border-slate-200 text-center">Preço de Compra</th>
                                         <th class="p-1 border-r border-slate-200 text-center bg-slate-200/50 text-slate-700">Custo Un.</th>
@@ -1610,7 +1626,7 @@
                         const isQtyUpdatedByAdmin = p.updatedBy?.includes("(ADM)");
 
                         const trClass = changedToday 
-                            ? "bg-amber-50/60 border-l-4 border-l-amber-500 hover:bg-amber-100/70 border-b border-slate-200 transition" 
+                            ? "row-highlight bg-amber-50/60 border-l-4 border-l-amber-500 hover:bg-amber-100/70 border-b border-slate-200 transition" 
                             : "hover:bg-slate-50 transition border-b border-slate-200";
 
                         rows += `
@@ -1689,7 +1705,7 @@
                 const changedToday = isUpdatedToday(p.lastUpdate);
 
                 const trClass = changedToday 
-                    ? "bg-amber-50/70 border-l-4 border-l-amber-500 font-bold transition" 
+                    ? "row-highlight bg-amber-50/70 border-l-4 border-l-amber-500 font-bold transition" 
                     : "hover:bg-slate-50 transition";
 
                 tbody.innerHTML += `
